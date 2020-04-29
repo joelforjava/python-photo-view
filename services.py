@@ -67,3 +67,32 @@ class PixabayPhotoFeedService:
         else:
             pass  # Do we just print an error? We probably shouldn't terminate the program!
 
+
+class PhotoFeed:
+    def __init__(self):
+        self.temp_dir = '__photo_frame/photos'
+        self.setup()
+
+    def setup(self):
+        # TODO - move to constructor
+        self.photo_list = []
+        for filename in os.listdir(self.temp_dir):
+            if is_image_file(filename):
+                self.photo_list.append(filename)
+        # END move to constructor
+        self.photo_count = len(self.photo_list)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return self.next()
+
+    def next(self):
+        if self.photo_count:
+            random_index = random.randint(0, self.photo_count-1)
+            selected_filename = self.photo_list[random_index]
+            # yield f'{self.temp_dir}/{selected_filename}'
+            return f'{self.temp_dir}/{selected_filename}'
+        else:
+            raise StopIteration()
