@@ -23,8 +23,7 @@ class SlideShowService:
     def get_random_photo(self):
         print('Loading Random Photo from cache')
         if self.photo_count:
-            selected = random.choice(self.photo_list)
-            return str(selected)
+            return random.choice(self.photo_list)
         return None
 
 
@@ -63,11 +62,18 @@ class PixabayPhotoFeedService:
 class PhotoFeed:
     def __init__(self):
         self.temp_dir = Path('__photo_frame/photos')
-        self.setup()
+        if not self.temp_dir.exists():
+            print('Temp directory not found. Will attempt to create.')
+            self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.refresh()
 
-    def setup(self):
+    def refresh(self):
         self.photo_list = [entry for entry in self.temp_dir.iterdir() if is_image_file(str(entry))]
         self.photo_count = len(self.photo_list)
+
+    @property
+    def has_photos(self):
+        return self.photo_count > 0
 
     def __iter__(self):
         return self
@@ -76,10 +82,8 @@ class PhotoFeed:
         return self.next()
 
     def next(self):
-        if self.photo_count:
-            random_index = random.randint(0, self.photo_count-1)
-            selected = self.photo_list[random_index]
-            return str(selected)
+        if self.has_photos:
+            return random.choice(self.photo_list)
         else:
             raise StopIteration()
 
@@ -94,8 +98,7 @@ def photo_feed():
     photo_list = [entry for entry in temp_dir.iterdir() if is_image_file(str(entry))]
     photo_count = len(photo_list)
     if photo_count:
-        selected = random.choice(photo_list)
-        yield str(selected)
+        yield random.choice(photo_list)
     else:
         raise StopIteration()
 
