@@ -1,6 +1,8 @@
 import os
 import random
 
+from pathlib import Path
+
 import requests
 
 
@@ -70,16 +72,11 @@ class PixabayPhotoFeedService:
 
 class PhotoFeed:
     def __init__(self):
-        self.temp_dir = '__photo_frame/photos'
+        self.temp_dir = Path('__photo_frame/photos')
         self.setup()
 
     def setup(self):
-        # TODO - move to constructor
-        self.photo_list = []
-        for filename in os.listdir(self.temp_dir):
-            if is_image_file(filename):
-                self.photo_list.append(filename)
-        # END move to constructor
+        self.photo_list = [entry for entry in self.temp_dir.iterdir() if is_image_file(str(entry))]
         self.photo_count = len(self.photo_list)
 
     def __iter__(self):
@@ -91,8 +88,35 @@ class PhotoFeed:
     def next(self):
         if self.photo_count:
             random_index = random.randint(0, self.photo_count-1)
-            selected_filename = self.photo_list[random_index]
+            selected = self.photo_list[random_index]
             # yield f'{self.temp_dir}/{selected_filename}'
-            return f'{self.temp_dir}/{selected_filename}'
+            return str(selected)
         else:
             raise StopIteration()
+
+
+def gather_photos():
+    temp_dir = Path('__photo_frame/photos')
+    return [entry for entry in temp_dir.iterdir() if is_image_file(str(entry))]
+
+
+def photo_feed():
+    temp_dir = Path('__photo_frame/photos')
+    photo_list = [entry for entry in temp_dir.iterdir() if is_image_file(str(entry))]
+    photo_count = len(photo_list)
+    if photo_count:
+        selected = random.choice(photo_list)
+        yield str(selected)
+    else:
+        raise StopIteration()
+
+
+def photo_feed_alt():
+    temp_dir = Path('__photo_frame/photos')
+    image_files = (entry for entry in temp_dir.iterdir() if is_image_file(str(entry)))
+    yield next(image_files)
+    # for entry in image_files:
+    #     yield entry
+
+
+image_files = (entry for entry in Path('__photo_frame/photos').iterdir() if is_image_file(str(entry)))
