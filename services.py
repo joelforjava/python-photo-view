@@ -28,9 +28,7 @@ class SlideShowService:
 
 
 def is_image_file(filename):
-	if filename.endswith('.jpg') or filename.endswith('.gif') or filename.endswith('.png'):
-		return True
-	return False
+	return filename.endswith('.jpg') or filename.endswith('.gif') or filename.endswith('.png')
 
 
 class PixabayPhotoFeedService:
@@ -83,7 +81,10 @@ class PhotoFeed:
 
     def next(self):
         if self.has_photos:
-            return random.choice(self.photo_list)
+            selected = random.choice(self.photo_list)
+            # return selected, selected
+            # Eventually, return path and image name
+            return selected
         else:
             raise StopIteration()
 
@@ -101,14 +102,3 @@ def photo_feed():
         yield random.choice(photo_list)
     else:
         raise StopIteration()
-
-
-def photo_feed_alt():
-    temp_dir = Path('__photo_frame/photos')
-    image_files = (entry for entry in temp_dir.iterdir() if is_image_file(str(entry)))
-    yield next(image_files)
-    # for entry in image_files:
-    #     yield entry
-
-
-image_files = (entry for entry in Path('__photo_frame/photos').iterdir() if is_image_file(str(entry)))
