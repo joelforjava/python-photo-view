@@ -4,6 +4,7 @@ import random
 from pathlib import Path
 
 import requests
+from PIL import Image, ImageTk
 
 
 class SlideShowService:
@@ -82,9 +83,9 @@ class PhotoFeed:
     def next(self):
         if self.has_photos:
             selected = random.choice(self.photo_list)
-            # return selected, selected
             # Eventually, return path and image name
-            return selected
+            return (ImageTk.PhotoImage(Image.open(selected))), selected
+            # return selected
         else:
             raise StopIteration()
 

@@ -6,7 +6,7 @@ from itertools import cycle
 import requests
 from PIL import Image, ImageTk
 
-from services import SlideShowService, PixabayPhotoFeedService
+from services import SlideShowService, PhotoFeed, PixabayPhotoFeedService
 
 
 class SlideShowFrame(tk.Tk):
@@ -15,7 +15,7 @@ class SlideShowFrame(tk.Tk):
         tk.Tk.__init__(self)
         self.geometry(f'+{x}+{y}')
         self.delay = delay
-        self.pictures = self.load_pictures(image_files)
+        self.pictures = image_files
         self.picture_display = tk.Label(self)
         self.picture_display.pack()
 
@@ -23,14 +23,11 @@ class SlideShowFrame(tk.Tk):
         '''cycle through the images and show them'''
         img_object, img_name = next(self.pictures)
         self.picture_display.config(image=img_object)
+        self.picture_display.image = img_object
         # shows the image filename, but could be expanded
         # to show an associated description of the image
         self.title(img_name)
         self.after(self.delay, self.show_slides)
-
-    @staticmethod
-    def load_pictures(image_files):
-        return cycle((ImageTk.PhotoImage(Image.open(image)), image) for image in image_files)
 
     def run(self):
         self.mainloop()
@@ -42,6 +39,6 @@ if __name__ == '__main__':
     _x = 100
     _y = 50
 
-    app = SlideShowFrame(SlideShowService().select_images(), _x, _y, _delay)
+    app = SlideShowFrame(PhotoFeed(), _x, _y, _delay)
     app.show_slides()
     app.run()
