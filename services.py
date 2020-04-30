@@ -100,6 +100,7 @@ def photo_feed():
     photo_list = [entry for entry in temp_dir.iterdir() if is_image_file(str(entry))]
     photo_count = len(photo_list)
     if photo_count:
-        yield random.choice(photo_list)
+        selected = random.choice(photo_list)
+        yield (ImageTk.PhotoImage(Image.open(selected))), selected
     else:
         raise StopIteration()
