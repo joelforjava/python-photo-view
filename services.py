@@ -5,7 +5,7 @@ from pathlib import Path
 
 import inflection
 import requests
-from PIL import Image, ImageTk
+from PIL import Image, ImageDraw, ImageFont, ImageTk
 
 
 class SlideShowService:
@@ -69,7 +69,7 @@ class PhotoFeed:
         self.refresh()
 
     def refresh(self):
-        self.photo_list = [entry for entry in self.temp_dir.iterdir() if is_image_file(str(entry))]
+        self.photo_list = list(gather_photos())
         self.photo_count = len(self.photo_list)
 
     @property
@@ -86,9 +86,21 @@ class PhotoFeed:
         if self.has_photos:
             selected = random.choice(self.photo_list)
             title = create_title(selected)
-            # Eventually, return path and image name
-            return (ImageTk.PhotoImage(Image.open(selected))), title
-            # return selected
+            return ImageTk.PhotoImage(Image.open(selected)), title
+        else:
+            raise StopIteration()
+
+
+class TitledPhotoFeed(PhotoFeed):
+    def next(self):
+        if self.has_photos:
+            selected = random.choice(self.photo_list)
+            title = create_title(selected)
+            im_ref = Image.open(selected)
+            draw = ImageDraw.Draw(im_ref)
+            font = ImageFont.truetype('/Library/Fonts/Georgia.ttf', 48)  # TODO - will need a better way to look up a font!
+            draw.text((5,5), title, (255,255,255), font=font)
+            return ImageTk.PhotoImage(im_ref), title
         else:
             raise StopIteration()
 

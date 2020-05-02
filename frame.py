@@ -3,9 +3,8 @@ import random
 import tkinter as tk
 
 import requests
-from PIL import Image, ImageTk
 
-from services import PhotoFeed, PixabayPhotoFeedService
+from services import PhotoFeed, PixabayPhotoFeedService, TitledPhotoFeed
 
 
 class SlideShowFrame(tk.Tk):
@@ -38,6 +37,12 @@ if __name__ == '__main__':
     _x = 0
     _y = 0
 
-    app = SlideShowFrame(PhotoFeed(), _x, _y, _delay)
+    show_titles = True  # TODO - put in settings/config file
+    if show_titles:
+        _feed = TitledPhotoFeed()
+    else:
+        _feed = PhotoFeed()
+
+    app = SlideShowFrame(_feed, _x, _y, _delay)
     app.show_slides()
     app.run()
