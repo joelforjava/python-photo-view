@@ -3,6 +3,7 @@ import random
 
 from pathlib import Path
 
+import inflection
 import requests
 from PIL import Image, ImageTk
 
@@ -29,7 +30,8 @@ class SlideShowService:
 
 
 def is_image_file(filename):
-	return filename.endswith('.jpg') or filename.endswith('.gif') or filename.endswith('.png')
+    # SEE: https://stackoverflow.com/questions/27599311/tkinter-photoimage-doesnt-not-support-png-image
+	return filename.endswith('.jpg') or filename.endswith('.gif')  # cannot easily handle png with tkinter 8.5 -- or filename.endswith('.png')
 
 
 class PixabayPhotoFeedService:
@@ -83,16 +85,27 @@ class PhotoFeed:
     def next(self):
         if self.has_photos:
             selected = random.choice(self.photo_list)
+            title = create_title(selected)
             # Eventually, return path and image name
-            return (ImageTk.PhotoImage(Image.open(selected))), selected
+            return (ImageTk.PhotoImage(Image.open(selected))), title
             # return selected
         else:
             raise StopIteration()
 
 
+def create_title(image_file: Path):
+    file_name = image_file.name
+    suffix = image_file.suffix
+    # Drop the file extension
+    minus_ext = file_name.replace(suffix, '')
+    # Intended to remove the trailing digits
+    minus_ext = ''.join(s for s in minus_ext if not s.isdigit())
+    return inflection.titleize(minus_ext)
+
+
 def gather_photos():
     temp_dir = Path('__photo_frame/photos')
-    return [entry for entry in temp_dir.iterdir() if is_image_file(str(entry))]
+    return (entry for entry in temp_dir.iterdir() if is_image_file(str(entry)))
 
 
 def photo_feed():

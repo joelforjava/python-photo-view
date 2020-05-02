@@ -1,12 +1,11 @@
 import os
 import random
 import tkinter as tk
-from itertools import cycle
 
 import requests
 from PIL import Image, ImageTk
 
-from services import SlideShowService, PhotoFeed, PixabayPhotoFeedService
+from services import PhotoFeed, PixabayPhotoFeedService
 
 
 class SlideShowFrame(tk.Tk):
@@ -36,8 +35,8 @@ class SlideShowFrame(tk.Tk):
 if __name__ == '__main__':
     _delay = 6000
 
-    _x = 100
-    _y = 50
+    _x = 0
+    _y = 0
 
     app = SlideShowFrame(PhotoFeed(), _x, _y, _delay)
     app.show_slides()
