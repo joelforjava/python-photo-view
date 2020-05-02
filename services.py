@@ -97,9 +97,10 @@ class TitledPhotoFeed(PhotoFeed):
             selected = random.choice(self.photo_list)
             title = create_title(selected)
             im_ref = Image.open(selected)
+            im_x, im_y = im_ref.size
             draw = ImageDraw.Draw(im_ref)
             font = ImageFont.truetype('/Library/Fonts/Georgia.ttf', 48)  # TODO - will need a better way to look up a font!
-            draw.text((5,5), title, (255,255,255), font=font)
+            draw.text((5,im_y-60), title, (255,255,255), font=font)
             return ImageTk.PhotoImage(im_ref), title
         else:
             raise StopIteration()
