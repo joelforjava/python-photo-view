@@ -30,8 +30,10 @@ class SlideShowService:
 
 
 def is_image_file(filename):
+    if isinstance(filename, Path):
+        return filename.suffix in ['.jpg', '.gif']
     # SEE: https://stackoverflow.com/questions/27599311/tkinter-photoimage-doesnt-not-support-png-image
-	return filename.endswith('.jpg') or filename.endswith('.gif')  # cannot easily handle png with tkinter 8.5 -- or filename.endswith('.png')
+    return filename.endswith('.jpg') or filename.endswith('.gif')  # cannot easily handle png with tkinter 8.5 -- or filename.endswith('.png')
 
 
 class PixabayPhotoFeedService:
@@ -66,6 +68,7 @@ class PhotoFeed:
         if not self.temp_dir.exists():
             print('Temp directory not found. Will attempt to create.')
             self.temp_dir.mkdir(parents=True, exist_ok=True)
+        self.current_image = None
         self.refresh()
 
     def refresh(self):
@@ -106,6 +109,16 @@ class TitledPhotoFeed(PhotoFeed):
             raise StopIteration()
 
 
+class Photo:
+    def __init__(self, file_path: Path, title=None):
+        self.file_path = file_path
+        self.image = Image.open(self.file_path)
+        self.title = title if title else create_title(file_path)
+
+    def as_photo_image(self):
+        return ImageTk.PhotoImage(self.image)
+
+
 def create_title(image_file: Path):
     file_name = image_file.name
     suffix = image_file.suffix
@@ -116,14 +129,15 @@ def create_title(image_file: Path):
     return inflection.titleize(minus_ext)
 
 
-def gather_photos():
-    temp_dir = Path('__photo_frame/photos')
-    return (entry for entry in temp_dir.iterdir() if is_image_file(str(entry)))
+def gather_photos(from_dir=None):
+    if not from_dir:
+        from_dir = Path('__photo_frame/photos')
+    return (entry for entry in from_dir.iterdir() if is_image_file(entry))
 
 
 def photo_feed():
     temp_dir = Path('__photo_frame/photos')
-    photo_list = [entry for entry in temp_dir.iterdir() if is_image_file(str(entry))]
+    photo_list = list(gather_photos(temp_dir))
     photo_count = len(photo_list)
     if photo_count:
         selected = random.choice(photo_list)
