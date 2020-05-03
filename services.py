@@ -88,8 +88,7 @@ class PhotoFeed:
     def next(self):
         if self.has_photos:
             selected = random.choice(self.photo_list)
-            title = create_title(selected)
-            return ImageTk.PhotoImage(Image.open(selected)), title
+            return selected.as_photo_image(), selected.title
         else:
             raise StopIteration()
 
@@ -98,13 +97,7 @@ class TitledPhotoFeed(PhotoFeed):
     def next(self):
         if self.has_photos:
             selected = random.choice(self.photo_list)
-            title = create_title(selected)
-            im_ref = Image.open(selected)
-            im_x, im_y = im_ref.size
-            draw = ImageDraw.Draw(im_ref)
-            font = ImageFont.truetype('/Library/Fonts/Georgia.ttf', 48)  # TODO - will need a better way to look up a font!
-            draw.text((5,im_y-60), title, (255,255,255), font=font)
-            return ImageTk.PhotoImage(im_ref), title
+            return selected.as_photo_image(with_title=True), selected.title
         else:
             raise StopIteration()
 
@@ -115,8 +108,20 @@ class Photo:
         self.image = Image.open(self.file_path)
         self.title = title if title else create_title(file_path)
 
-    def as_photo_image(self):
+    def as_photo_image(self, with_title: bool=False):
+        if with_title:
+            return self.__as_photo_image_with_title()
         return ImageTk.PhotoImage(self.image)
+
+    def __as_photo_image_with_title(self):
+        im_x, im_y = self.image.size
+        draw = ImageDraw.Draw(self.image)
+        font = ImageFont.truetype('/Library/Fonts/Georgia.ttf', 48)  # TODO - will need a better way to look up a font!
+        draw.text((5,im_y-60), self.title, (255,255,255), font=font)
+        return ImageTk.PhotoImage(self.image)
+
+    def __repr__(self):
+        return f'{self.title} at {self.file_path}'
 
 
 def create_title(image_file: Path):
@@ -126,13 +131,13 @@ def create_title(image_file: Path):
     minus_ext = file_name.replace(suffix, '')
     # Intended to remove the trailing digits
     minus_ext = ''.join(s for s in minus_ext if not s.isdigit())
-    return inflection.titleize(minus_ext)
+    return inflection.titleize(minus_ext).strip()
 
 
 def gather_photos(from_dir=None):
     if not from_dir:
         from_dir = Path('__photo_frame/photos')
-    return (entry for entry in from_dir.iterdir() if is_image_file(entry))
+    return (Photo(entry) for entry in from_dir.iterdir() if is_image_file(entry))
 
 
 def photo_feed():
@@ -141,6 +146,6 @@ def photo_feed():
     photo_count = len(photo_list)
     if photo_count:
         selected = random.choice(photo_list)
-        yield (ImageTk.PhotoImage(Image.open(selected))), selected
+        yield selected
     else:
         raise StopIteration()
