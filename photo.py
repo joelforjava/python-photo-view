@@ -11,15 +11,17 @@ class Photo:
         self.title = title if title else create_title(file_path)
 
     def as_photo_image(self, with_title: bool = False):
-        if with_title:
-            return self.__as_photo_image_with_title()
-        return ImageTk.PhotoImage(self.image)
 
-    def __as_photo_image_with_title(self):
-        im_x, im_y = self.image.size
-        draw = ImageDraw.Draw(self.image)
-        font = ImageFont.truetype('/Library/Fonts/Georgia.ttf', 48)  # TODO - will need a better way to look up a font!
-        draw.text((5, im_y - 60), self.title, (255, 255, 255), font=font)
+        def image_with_title():
+            im_x, im_y = self.image.size
+            draw = ImageDraw.Draw(self.image)
+            font = ImageFont.truetype('/Library/Fonts/Georgia.ttf',
+                                      48)  # TODO - will need a better way to look up a font!
+            draw.text((5, im_y - 60), self.title, (255, 255, 255), font=font)
+            return ImageTk.PhotoImage(self.image)
+
+        if with_title:
+            return image_with_title()
         return ImageTk.PhotoImage(self.image)
 
     def __repr__(self):

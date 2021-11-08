@@ -1,2 +1,3 @@
 [default]
 show_titles = yes
+delay_ms = 6000

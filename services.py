@@ -9,27 +9,6 @@ import requests
 from photo import Photo
 
 
-class SlideShowService:
-
-    def __init__(self):
-        self.temp_dir = Path('__photo_frame/photos')
-        self.init_images()
-
-    def init_images(self):
-        self.photo_list = [entry for entry in self.temp_dir.iterdir() if is_image_file(str(entry))]
-        self.photo_count = len(self.photo_list)
-
-    def select_images(self, count=5):
-        sample_size = count if count <= self.photo_count else self.photo_count
-        return random.sample(self.photo_list, sample_size)
-
-    def get_random_photo(self):
-        print('Loading Random Photo from cache')
-        if self.photo_count:
-            return random.choice(self.photo_list)
-        return None
-
-
 def is_image_file(filename: Union[Path, str]) -> bool:
     if isinstance(filename, Path):
         return filename.suffix in ['.jpg', '.gif']
@@ -52,7 +31,7 @@ class PixabayPhotoFeedService:
             'order': 'popular',
             'editors_choice': 'false',
             'image_type': 'photo',
-            'per_page': 28
+            'per_page': 3
         }
         headers = {'Content-Type': 'application/json'}
 
@@ -67,21 +46,49 @@ class PixabayPhotoFeedService:
         return self.current_feed
 
 
+class PhotoDownloader:
+    def __init__(self, service, download_path: Path):
+        self.photo_service = service
+        self.download_path = download_path
+
+    def download_feed(self):
+        def has_file(file_name):
+            f = Path(f'{self.download_path}/{file_name}')
+            return f.exists()
+
+        def create_file_name(image_url, page_url):
+            """
+            create a file name for use by the system for saving and
+            loading pictures to and from the cache
+            """
+            file_name = determine_file_name_from_url(page_url)
+            file_extension = determine_file_extension(image_url)
+            return file_name + file_extension
+
+        def download_photo(item):
+            image_url = item['largeImageURL']
+            page_url = item['pageURL']
+            file_name = create_file_name(image_url, page_url)
+            if not has_file(file_name):
+                print(f'Caching: {image_url} as \n\t{file_name}')
+                resp = requests.get(image_url)
+                data = resp.content if resp.status_code == 200 else None
+                if data:
+                    with (self.download_path / file_name).open('wb') as f:
+                        f.write(data)
+                    print(f'Saved {file_name}')
+            else:
+                print(f'File {file_name} was found in the cache. Skipping download.')
+
+        feed = self.photo_service.retrieve_feed()
+        for img in feed:
+            download_photo(img)
+
+
 def gather_photos(from_dir=None):
     if not from_dir:
         from_dir = Path('__photo_frame/photos')
     return (Photo(entry) for entry in from_dir.iterdir() if is_image_file(entry))
-
-
-def photo_feed():
-    temp_dir = Path('__photo_frame/photos')
-    photo_list = list(gather_photos(temp_dir))
-    photo_count = len(photo_list)
-    if photo_count:
-        selected = random.choice(photo_list)
-        yield selected
-    else:
-        raise StopIteration()
 
 
 def determine_file_name_from_url(url):

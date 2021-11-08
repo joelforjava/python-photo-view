@@ -3,7 +3,7 @@ from configparser import ConfigParser
 from pathlib import Path
 
 from constants import TOKEN
-from services import PixabayPhotoFeedService
+from services import PixabayPhotoFeedService, PhotoDownloader
 from feeds import PhotoFeed, TitledPhotoFeed
 
 
@@ -32,16 +32,18 @@ class SlideShowFrame(tk.Tk):
 
 
 if __name__ == '__main__':
-    # defaults = {
-    #     'request': {
-    #         'token': TOKEN,
-    #         'base_url': 'https://pixabay.com/api',
-    #         'image_key': 'largeImageURL'
-    #     },
-    #     'update_interval': 20
-    # }
-    #
-    # feed_service = PixabayPhotoFeedService(defaults)
+    defaults = {
+        'request': {
+            'token': TOKEN,
+            'base_url': 'https://pixabay.com/api',
+            'image_key': 'largeImageURL'
+        },
+        'update_interval': 20
+    }
+
+    feed_service = PixabayPhotoFeedService(defaults)
+    downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'))
+    downloader.download_feed()
 
     configs_root = Path(__file__).parent / 'configs'
     config_file_path = configs_root / 'config.ini'
