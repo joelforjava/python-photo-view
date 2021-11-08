@@ -1,14 +1,14 @@
-import os
-import random
 import tkinter as tk
+from configparser import ConfigParser
+from pathlib import Path
 
-import requests
-
-from services import PhotoFeed, PixabayPhotoFeedService, TitledPhotoFeed
+from constants import TOKEN
+from services import PixabayPhotoFeedService
+from feeds import PhotoFeed, TitledPhotoFeed
 
 
 class SlideShowFrame(tk.Tk):
-    '''Tk window/label adjusts to size of image'''
+    """Tk window/label adjusts to size of image"""
     def __init__(self, image_files, x, y, delay):
         tk.Tk.__init__(self)
         self.geometry(f'+{x}+{y}')
@@ -18,7 +18,7 @@ class SlideShowFrame(tk.Tk):
         self.picture_display.pack()
 
     def show_slides(self):
-        '''cycle through the images and show them'''
+        """cycle through the images and show them"""
         img_object, img_name = next(self.pictures)
         self.picture_display.config(image=img_object)
         self.picture_display.image = img_object
@@ -32,12 +32,28 @@ class SlideShowFrame(tk.Tk):
 
 
 if __name__ == '__main__':
-    _delay = 6000
+    # defaults = {
+    #     'request': {
+    #         'token': TOKEN,
+    #         'base_url': 'https://pixabay.com/api',
+    #         'image_key': 'largeImageURL'
+    #     },
+    #     'update_interval': 20
+    # }
+    #
+    # feed_service = PixabayPhotoFeedService(defaults)
+
+    configs_root = Path(__file__).parent / 'configs'
+    config_file_path = configs_root / 'config.ini'
+    config = ConfigParser()
+    config.read(config_file_path)
+
+    _delay = config['default'].getint('delay_ms')
 
     _x = 0
     _y = 0
 
-    show_titles = True  # TODO - put in settings/config file
+    show_titles = config['default'].getboolean('show_titles')
     if show_titles:
         _feed = TitledPhotoFeed()
     else:
