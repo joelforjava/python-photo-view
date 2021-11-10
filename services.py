@@ -82,21 +82,27 @@ class CategoryService:
 
 class PixabayPhotoFeedService:
     def __init__(self, args):
-        self.base_url = args['request']['base_url']
-        self.api_token = args['request']['token']
-        self.image_key = args['request']['image_key']
-        self.max_photos = args.get('max_photos', 3)
+        self.base_url = args['base_url']
+        self.api_token = args['token']
+        self.image_key = args['image_key']
+        self.max_photos = args.getint('max_photos', 3)
+        self.order = args.get('order', 'popular')
+        self.image_type = args.get('image_type', 'photo')
+        self.category = args.get('category', None)
         self.current_feed = None
 
     def retrieve_feed(self):
         """ Get latest photo feed """
         data = {
             'key': self.api_token,
-            'order': 'popular',
+            'order': self.order,
             'editors_choice': 'false',
-            'image_type': 'photo',
+            'image_type': self.image_type,
             'per_page': self.max_photos,
         }
+        if self.category and self.category != 'all':
+            data['category'] = self.category
+
         headers = {'Content-Type': 'application/json'}
 
         print(f'Downloading feed from {self.base_url}')
@@ -105,7 +111,7 @@ class PixabayPhotoFeedService:
             # TODO - check to see if we can use any metadata for categorization
             self.current_feed = response.json()['hits']
         else:
-            pass  # Do we just print an error? We probably shouldn't terminate the program!
+            print(f'There was an error connecting to {self.base_url}: {response.status_code}')
 
         return self.current_feed
 

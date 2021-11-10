@@ -1,4 +1,12 @@
-[default]
+[DEFAULT]
 show_titles = yes
 delay_ms = 6000
 categories = all
+max_photos = 10
+update_interval = 20
+
+[service.pixabay]
+base_url = https://pixabay.com/api
+image_key = largeImageURL
+token = abcdef-123401aaaaaaaaaa
+category = music

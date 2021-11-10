@@ -2,7 +2,6 @@ import tkinter as tk
 from configparser import ConfigParser
 from pathlib import Path
 
-from constants import TOKEN
 from services import PixabayPhotoFeedService, PhotoDownloader
 from feeds import PhotoFeed, TitledPhotoFeed
 
@@ -32,32 +31,24 @@ class SlideShowFrame(tk.Tk):
 
 
 if __name__ == '__main__':
-    defaults = {
-        'request': {
-            'token': TOKEN,
-            'base_url': 'https://pixabay.com/api',
-            'image_key': 'largeImageURL'
-        },
-        'max_photos': 8,
-        'update_interval': 20
-    }
-
-    feed_service = PixabayPhotoFeedService(defaults)
-    downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'))
-    downloader.download_feed()
 
     configs_root = Path(__file__).parent / 'configs'
     config_file_path = configs_root / 'config.ini'
     config = ConfigParser()
     config.read(config_file_path)
 
-    _delay = config['default'].getint('delay_ms')
+    feed_service = PixabayPhotoFeedService(config['service.pixabay'])
+    downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'))
+    downloader.download_feed()
+
+    frame_config = config['DEFAULT']
+    _delay = frame_config.getint('delay_ms')
 
     _x = 0
     _y = 0
 
-    show_titles = config['default'].getboolean('show_titles')
-    categories = config['default']['categories']
+    show_titles = frame_config.getboolean('show_titles')
+    categories = frame_config['categories']
     if show_titles:
         _feed = TitledPhotoFeed(categories=categories)
     else:
