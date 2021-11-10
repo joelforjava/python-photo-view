@@ -52,6 +52,33 @@ class CategoryService:
         for category in categories:
             update_category(file_path, category)
 
+    def load_from_categories(self, categories):
+
+        def load_category(category):
+            cat_path = self.data_path / f'{category}.json'
+
+            if not cat_path.exists():
+                print(f'Category "{category}" not found.')
+                return []
+
+            with cat_path.open('r') as f:
+                existing = json.load(f)
+
+            # This assumes the entry actually exists on the filesystem.
+            # Need to check that the file exists!
+            return [Path(entry) for entry in existing]
+
+        parsed = [x.strip() for x in categories.split(',')]
+        if 'all' in parsed:
+            # If any category is all, just return all
+            return gather_photos()
+
+        all_paths = set()  # Prevent images from being listed multiple times
+        for c in parsed:
+            all_paths.update(load_category(c))
+
+        return (Photo(p) for p in all_paths)
+
 
 class PixabayPhotoFeedService:
     def __init__(self, args):
@@ -164,4 +191,11 @@ if __name__ == '__main__':
             category_service.save_to_categories(img, tags[:-1])
             time.sleep(1)
 
-    save_existing()
+    def test_categories():
+        category_service = CategoryService(Path('configs/categories'))
+        trees = category_service.load_from_categories('trees,tulip,all')
+
+        for item in trees:
+            print(item)
+
+    test_categories()

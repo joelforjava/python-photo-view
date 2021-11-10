@@ -1,11 +1,13 @@
 import random
 from pathlib import Path
 
-from services import gather_photos
+from services import CategoryService
 
 
 class PhotoFeed:
-    def __init__(self):
+    def __init__(self, categories=None):
+        if not categories:
+            categories = 'all'
         self.temp_dir = Path('__photo_frame/photos')
         if not self.temp_dir.exists():
             print('Temp directory not found. Will attempt to create.')
@@ -13,10 +15,12 @@ class PhotoFeed:
         self.current_image = None
         self.photo_list = []
         self.photo_count = 0
+        self.categories = categories
+        self.category_service = CategoryService(Path('configs/categories'))
         self.refresh()
 
     def refresh(self):
-        self.photo_list = list(gather_photos())
+        self.photo_list = list(self.category_service.load_from_categories(self.categories))
         self.photo_count = len(self.photo_list)
 
     @property

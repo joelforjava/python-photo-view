@@ -38,7 +38,7 @@ if __name__ == '__main__':
             'base_url': 'https://pixabay.com/api',
             'image_key': 'largeImageURL'
         },
-        'max_photos': 3,
+        'max_photos': 8,
         'update_interval': 20
     }
 
@@ -57,10 +57,11 @@ if __name__ == '__main__':
     _y = 0
 
     show_titles = config['default'].getboolean('show_titles')
+    categories = config['default']['categories']
     if show_titles:
-        _feed = TitledPhotoFeed()
+        _feed = TitledPhotoFeed(categories=categories)
     else:
-        _feed = PhotoFeed()
+        _feed = PhotoFeed(categories=categories)
 
     app = SlideShowFrame(_feed, _x, _y, _delay)
     app.show_slides()
