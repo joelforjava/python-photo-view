@@ -38,6 +38,7 @@ if __name__ == '__main__':
             'base_url': 'https://pixabay.com/api',
             'image_key': 'largeImageURL'
         },
+        'max_photos': 3,
         'update_interval': 20
     }
 
