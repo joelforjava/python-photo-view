@@ -1,8 +1,6 @@
 import tkinter as tk
-from configparser import ConfigParser
-from pathlib import Path
 
-from services import PixabayPhotoFeedService, PhotoDownloader
+from common import CONFIG
 from feeds import PhotoFeed, TitledPhotoFeed
 
 
@@ -32,16 +30,9 @@ class SlideShowFrame(tk.Tk):
 
 if __name__ == '__main__':
 
-    configs_root = Path(__file__).parent / 'configs'
-    config_file_path = configs_root / 'config.ini'
-    config = ConfigParser()
-    config.read(config_file_path)
+    # Demo only the frame, assuming there are some existing images.
 
-    feed_service = PixabayPhotoFeedService(config['service.pixabay'])
-    downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'))
-    downloader.download_feed()
-
-    frame_config = config['DEFAULT']
+    frame_config = CONFIG['DEFAULT']
     _delay = frame_config.getint('delay_ms')
 
     _x = 0
