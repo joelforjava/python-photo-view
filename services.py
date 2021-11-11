@@ -1,6 +1,7 @@
 import json
 import time
 
+from multiprocessing.dummy import Pool as ThreadPool
 from pathlib import Path
 from typing import Union
 
@@ -156,8 +157,11 @@ class PhotoDownloader:
                 print(f'File {file_name} was found in the cache. Skipping download.')
 
         feed = self.photo_service.retrieve_feed()
-        for img in feed:
-            download_photo(img)
+        if feed:
+            cache_pool = ThreadPool(4)
+            cache_pool.map(download_photo, feed)
+            cache_pool.close()
+            cache_pool.join()
 
 
 def gather_photos(from_dir=None):
@@ -187,7 +191,7 @@ if __name__ == '__main__':
         category_service = CategoryService(Path('configs/categories'))
         existing_images = [entry for entry in Path('__photo_frame/photos').iterdir() if is_image_file(entry)]
         for img in existing_images:
-            n = img.name
+            n = img.stem
             print(f'Processing: {img}')
             tags = n.split('-')
             print(f'Found tags: {tags[:-1]}')
