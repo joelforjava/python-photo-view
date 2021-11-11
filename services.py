@@ -10,12 +10,20 @@ import requests
 from photo import Photo
 
 
-def is_image_file(filename: Union[Path, str]) -> bool:
-    if isinstance(filename, Path):
-        return filename.suffix in ['.jpg', '.gif']
+def is_image_file(file_path: Path) -> bool:
+    """
+    Determines whether or not the provided Path object represents a valid image file.
+
+    :param file_path: The Path representing the file we wish to verify as a valid file.
+    :return: True if the Path represents a valid image file. False otherwise.
+    """
     # SEE: https://stackoverflow.com/questions/27599311/tkinter-photoimage-doesnt-not-support-png-image
-    return filename.endswith('.jpg') or filename.endswith(
-        '.gif')  # cannot easily handle png with tkinter 8.5 -- or filename.endswith('.png')
+    # cannot easily handle png with tkinter 8.5 -- or filename.endswith('.png')
+    has_valid_suffix = file_path.suffix in ['.jpg', '.gif']
+    if not has_valid_suffix:
+        return has_valid_suffix
+
+    return file_path.exists()
 
 
 class CategoryService:
@@ -25,6 +33,13 @@ class CategoryService:
             self.data_path.mkdir(parents=True, exist_ok=True)
 
     def save_to_categories(self, file_path, tags: Union[str, list]):
+        """
+        Save a string representation of a Path to the category store using the provided tags.
+
+        :param file_path: The Path we wish to save to the category store.
+        :param tags: The tags used to represent this file.
+        :return: None
+        """
 
         def update_category(f_path, cat_name):
             cat_path = self.data_path / f'{cat_name}.json'
@@ -54,6 +69,13 @@ class CategoryService:
             update_category(file_path, category)
 
     def load_from_categories(self, categories):
+        """
+        Load the images (as Photo objects) that represent the provided categories.
+
+        If 'all' is provided in categories, then all images are returned.
+        :param categories: A comma-separated list of categories we wish to retrieve.
+        :return: a Generator containing all of the images matching the provided categories.
+        """
 
         def load_category(category):
             cat_path = self.data_path / f'{category}.json'
@@ -90,6 +112,7 @@ class PixabayPhotoFeedService:
         self.order = args.get('order', 'popular')
         self.image_type = args.get('image_type', 'photo')
         self.category = args.get('category', None)
+        self.editors_choice = args.get('editors_choice', 'false')
         self.current_feed = None
 
     def retrieve_feed(self):
@@ -97,7 +120,7 @@ class PixabayPhotoFeedService:
         data = {
             'key': self.api_token,
             'order': self.order,
-            'editors_choice': 'false',
+            'editors_choice': self.editors_choice,
             'image_type': self.image_type,
             'per_page': self.max_photos,
         }
@@ -201,11 +224,13 @@ if __name__ == '__main__':
             category_service.save_to_categories(img, tags[:-1])
             time.sleep(1)
 
+
     def test_categories():
         category_service = CategoryService(Path('configs/categories'))
         trees = category_service.load_from_categories('trees,tulip,all')
 
         for item in trees:
             print(item)
+
 
     test_categories()
