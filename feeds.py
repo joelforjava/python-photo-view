@@ -20,8 +20,10 @@ class PhotoFeed:
         self.refresh()
 
     def refresh(self):
+        old_size = self.photo_count
         self.photo_list = list(self.category_service.load_from_categories(self.categories))
         self.photo_count = len(self.photo_list)
+        print(f'Feed photo count: {old_size} -> {self.photo_count}')
 
     @property
     def has_photos(self):

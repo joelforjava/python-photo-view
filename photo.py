@@ -29,10 +29,7 @@ class Photo:
 
 
 def create_title(image_file: Path):
-    file_name = image_file.name
-    suffix = image_file.suffix
-    # Drop the file extension
-    minus_ext = file_name.replace(suffix, '')
+    file_name = image_file.stem
     # Intended to remove the trailing digits
-    minus_ext = ''.join(s for s in minus_ext if not s.isdigit())
+    minus_ext = ''.join(s for s in file_name if not s.isdigit())
     return inflection.titleize(minus_ext).strip()

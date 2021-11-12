@@ -1,9 +1,9 @@
-import threading
 from pathlib import Path
 
 from common import CONFIG
 from feeds import PhotoFeed, TitledPhotoFeed
 from frame import SlideShowFrame
+from timers import RepeatedTimer
 from services import PixabayPhotoFeedService, PhotoDownloader
 
 
@@ -32,11 +32,13 @@ def run():
         _feed = PhotoFeed(categories=categories)
 
     update_interval = frame_config.getint('update_interval', 300)
-    update_thread = threading.Timer(update_interval, update, args=[downloader, _feed])
-    update_thread.start()
-    app = SlideShowFrame(_feed, _x, _y, _delay)
-    app.show_slides()
-    app.run()
+    thread = RepeatedTimer(update_interval, update, downloader, _feed)
+    try:
+        app = SlideShowFrame(_feed, _x, _y, _delay)
+        app.show_slides()
+        app.run()
+    finally:
+        thread.stop()
 
 
 if __name__ == '__main__':
