@@ -1,7 +1,7 @@
 import json
 import time
 
-from multiprocessing.dummy import Pool as ThreadPool
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Union
 
@@ -181,10 +181,8 @@ class PhotoDownloader:
 
         feed = self.photo_service.retrieve_feed()
         if feed:
-            cache_pool = ThreadPool(4)
-            cache_pool.map(download_photo, feed)
-            cache_pool.close()
-            cache_pool.join()
+            with ThreadPoolExecutor(max_workers=4) as executor:
+                executor.map(download_photo, feed)
 
 
 def gather_photos(from_dir=None):
