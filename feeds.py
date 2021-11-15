@@ -1,3 +1,4 @@
+import logging
 import random
 from pathlib import Path
 
@@ -8,9 +9,10 @@ class PhotoFeed:
     def __init__(self, categories=None):
         if not categories:
             categories = 'all'
+        self.log = logging.getLogger('frame.PhotoFeed')
         self.temp_dir = Path('__photo_frame/photos')
         if not self.temp_dir.exists():
-            print('Temp directory not found. Will attempt to create.')
+            self.log.debug('Temp directory not found. Will attempt to create.')
             self.temp_dir.mkdir(parents=True, exist_ok=True)
         self.current_image = None
         self.photo_list = []
@@ -23,7 +25,7 @@ class PhotoFeed:
         old_size = self.photo_count
         self.photo_list = list(self.category_service.load_from_categories(self.categories))
         self.photo_count = len(self.photo_list)
-        print(f'Feed photo count: {old_size} -> {self.photo_count}')
+        self.log.info('Feed photo count: %d -> %d', old_size, self.photo_count)
 
     @property
     def has_photos(self):

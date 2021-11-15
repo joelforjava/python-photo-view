@@ -27,7 +27,9 @@ def is_image_file(file_path: Path) -> bool:
 
 
 class CategoryService:
-    def __init__(self, data_path: Path):
+    def __init__(self, data_path: Path = None):
+        if not data_path:
+            data_path = Path('configs/categories')
         self.data_path = data_path
         if not self.data_path.exists():
             self.data_path.mkdir(parents=True, exist_ok=True)

@@ -58,8 +58,8 @@ class Configuration:
         # The config data is not loaded until load() is called.
         self.initialized = False
 
-    def load(self):
-        if not self.initialized:
+    def load(self, reload=False):
+        if not self.initialized or reload:
             print('Loading configuration')
             with self.config_file.open('r') as cf:
                 self.cfg.read(cf)

@@ -1,3 +1,6 @@
+import json
+import logging
+import logging.config
 from pathlib import Path
 
 from common import CONFIG
@@ -14,6 +17,8 @@ def update(downloader, feed):
 
 
 def run():
+    with Path('configs/logging.json').open('r') as lc:
+        logging.config.dictConfig(json.load(lc))
     feed_service = PixabayPhotoFeedService(CONFIG['service.pixabay'])
     downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'))
     downloader.download_feed()

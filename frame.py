@@ -1,3 +1,4 @@
+import logging
 import tkinter as tk
 
 from common import CONFIG
@@ -10,6 +11,7 @@ class SlideShowFrame(tk.Tk):
         tk.Tk.__init__(self)
         self.geometry(f'+{x}+{y}')
         self.delay = delay
+        self.log = logging.getLogger('frame.SlideShowFrame')
         self.pictures = image_files
         self.picture_display = tk.Label(self)
         self.picture_display.pack()
@@ -23,6 +25,7 @@ class SlideShowFrame(tk.Tk):
         # to show an associated description of the image
         self.title(img_name)
         self.after(self.delay, self.show_slides)
+        self.log.info('Displaying: %s', img_name)
 
     def run(self):
         self.mainloop()
