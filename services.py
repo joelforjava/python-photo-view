@@ -1,4 +1,6 @@
 import json
+import logging
+import sqlite3
 import time
 
 from concurrent.futures import ThreadPoolExecutor
@@ -24,6 +26,36 @@ def is_image_file(file_path: Path) -> bool:
         return has_valid_suffix
 
     return file_path.exists()
+
+
+class TaggingService:
+    def __init__(self, data_path: Path = None):
+        if not data_path:
+            data_path = Path('configs/tags/tags.db')
+        self.data_path = data_path
+        self.log = logging.getLogger('frame.TaggingService')
+        if not self.data_path.exists():
+            self.log.warning('Data directory "%s" does not exist. Attempting to create', data_path)
+            self.data_path.parent.mkdir(parents=True, exist_ok=True)
+        self.db = sqlite3.connect(data_path)
+
+    def setup_tables(self):
+        create_photo_table = """CREATE TABLE IF NOT EXISTS photos
+        (id integer primary key autoincrement, img_path text, date_added text, date_last_displayed text, disabled text, 
+         title text, subtitle text, score integer)
+        """
+        create_category_table = """CREATE TABLE IF NOT EXISTS categories 
+        (id integer primary key autoincrement, tag text)"""
+
+        create_join_table = """CREATE TABLE IF NOT EXISTS categories_photos 
+        (category_id integer, photo_id integer,
+         constraint `fk_category_id` foreign key (category_id) references categories(id),
+         constraint `fk_photo_id` foreign key (photo_id) references photos(id))"""
+
+        cur = self.db.cursor()
+        for comm in [create_photo_table, create_category_table, create_join_table]:
+            cur.execute(comm)
+        self.db.commit()
 
 
 class CategoryService:
@@ -233,4 +265,4 @@ if __name__ == '__main__':
             print(item)
 
 
-    test_categories()
+    # test_categories()
