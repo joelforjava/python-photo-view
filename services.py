@@ -4,6 +4,7 @@ import sqlite3
 import time
 
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from pathlib import Path
 from typing import Union
 
@@ -31,7 +32,7 @@ def is_image_file(file_path: Path) -> bool:
 class TaggingService:
     def __init__(self, data_path: Path = None):
         if not data_path:
-            data_path = Path('configs/tags/tags.db')
+            data_path = Path('configs/db/tags.db')
         self.data_path = data_path
         self.log = logging.getLogger('frame.TaggingService')
         if not self.data_path.exists():
@@ -41,11 +42,11 @@ class TaggingService:
 
     def setup_tables(self):
         create_photo_table = """CREATE TABLE IF NOT EXISTS photos
-        (id integer primary key autoincrement, img_path text, date_added text, date_last_displayed text, disabled text, 
-         title text, subtitle text, score integer)
+        (id integer primary key autoincrement, img_path text, img_width integer, img_height integer, date_added text, 
+         date_last_displayed text, disabled text, title text, subtitle text, score integer)
         """
         create_category_table = """CREATE TABLE IF NOT EXISTS categories 
-        (id integer primary key autoincrement, tag text)"""
+        (id integer primary key autoincrement, tag text unique)"""
 
         create_join_table = """CREATE TABLE IF NOT EXISTS categories_photos 
         (category_id integer, photo_id integer,
@@ -56,6 +57,44 @@ class TaggingService:
         for comm in [create_photo_table, create_category_table, create_join_table]:
             cur.execute(comm)
         self.db.commit()
+
+    def setup_categories(self):
+        json_path = Path('configs/categories')
+        cur = self.db.cursor()
+        cat_names = []
+        for f in json_path.iterdir():
+            if f.is_file() and f.suffix == '.json':
+                cat_name = f.stem
+                print(f'Found category: {cat_name}')
+                cat_names.append([cat_name])
+        try:
+            cur.executemany('INSERT INTO categories (tag) values (?)', cat_names)
+        except sqlite3.DatabaseError as de:
+            print(f' -- {de}')
+            raise
+        finally:
+            self.db.commit()
+            self.db.close()
+
+    def setup_photos(self):
+        cur = self.db.cursor()
+        all_photos = gather_photos()
+        items = []
+        for photo in all_photos:
+            im_w, im_h = photo.image.size
+            dt_added = datetime.fromtimestamp(photo.file_path.stat().st_ctime).isoformat()
+            items.append([str(photo.file_path), im_w, im_h, dt_added, photo.title])
+        try:
+            cur.executemany(
+                'INSERT INTO photos (img_path, img_width, img_height, date_added, title) values (?,?,?,?,?)',
+                items
+            )
+        except sqlite3.DatabaseError as de:
+            print(f' -- {de}')
+            raise
+        finally:
+            self.db.commit()
+            self.db.close()
 
 
 class CategoryService:
@@ -265,4 +304,11 @@ if __name__ == '__main__':
             print(item)
 
 
+    def setup_db_items():
+        tag_service = TaggingService()
+        # tag_service.setup_tables()
+        # tag_service.setup_categories()
+        tag_service.setup_photos()
+
     # test_categories()
+    setup_db_items()
