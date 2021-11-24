@@ -96,6 +96,39 @@ class TaggingService:
             self.db.commit()
             self.db.close()
 
+    def setup_join_table(self):
+        json_path = Path('configs/categories')
+        cur = self.db.cursor()
+        temp_mapping = {}
+        for f in json_path.iterdir():
+            if f.is_file() and f.suffix == '.json':
+                cat_name = f.stem
+                with f.open('r') as cat_file:
+                    temp_mapping[cat_name] = json.load(cat_file)
+
+        # print(temp_mapping)
+        for k, v in temp_mapping.items():
+            q_items = [k] + v
+            print(f'Adding category mappings for: {k}')
+            try:
+                qmarks = ','.join(['?']*len(v))
+                cur.execute(
+                    f'''INSERT INTO categories_photos (category_id,photo_id)
+                        SELECT c.id as category_id, p.id as photo_id
+                        FROM categories c JOIN photos p
+                        WHERE c.tag = ?
+                        AND p.img_path in ({qmarks}) 
+                    ''',
+                    q_items
+                )
+                time.sleep(.5)
+            except sqlite3.DatabaseError as de:
+                print(f' -- {de}')
+                raise
+
+        self.db.commit()
+        self.db.close()
+
 
 class CategoryService:
     def __init__(self, data_path: Path = None):
@@ -308,7 +341,8 @@ if __name__ == '__main__':
         tag_service = TaggingService()
         # tag_service.setup_tables()
         # tag_service.setup_categories()
-        tag_service.setup_photos()
+        # tag_service.setup_photos()
+        tag_service.setup_join_table()
 
     # test_categories()
     setup_db_items()
