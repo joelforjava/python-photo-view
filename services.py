@@ -32,102 +32,151 @@ def is_image_file(file_path: Path) -> bool:
 class TaggingService:
     def __init__(self, data_path: Path = None):
         if not data_path:
-            data_path = Path('configs/db/tags.db')
+            data_path = Path('__photo_frame/db/tags.db')
         self.data_path = data_path
         self.log = logging.getLogger('frame.TaggingService')
+        requires_setup = False
         if not self.data_path.exists():
             self.log.warning('Data directory "%s" does not exist. Attempting to create', data_path)
             self.data_path.parent.mkdir(parents=True, exist_ok=True)
+            requires_setup = True
         self.db = sqlite3.connect(data_path)
+        if requires_setup:
+            self._setup()
 
-    def setup_tables(self):
-        create_photo_table = """CREATE TABLE IF NOT EXISTS photos
-        (id integer primary key autoincrement, img_path text, img_width integer, img_height integer, date_added text, 
-         date_last_displayed text, disabled text, title text, subtitle text, score integer)
-        """
-        create_category_table = """CREATE TABLE IF NOT EXISTS categories 
-        (id integer primary key autoincrement, tag text unique)"""
+    def _setup(self):
 
-        create_join_table = """CREATE TABLE IF NOT EXISTS categories_photos 
-        (category_id integer, photo_id integer,
-         constraint `fk_category_id` foreign key (category_id) references categories(id),
-         constraint `fk_photo_id` foreign key (photo_id) references photos(id))"""
+        def tables():
+            self.log.info("Creating tables")
+            create_photo_table = """CREATE TABLE photos
+                                    (id integer primary key autoincrement, img_path text, img_width integer, 
+                                    img_height integer, date_added text, date_last_displayed text, 
+                                    times_displayed integer, disabled text, title text, subtitle text, 
+                                    score integer)"""
 
-        cur = self.db.cursor()
-        for comm in [create_photo_table, create_category_table, create_join_table]:
-            cur.execute(comm)
-        self.db.commit()
+            create_category_table = """CREATE TABLE categories (id integer primary key autoincrement, 
+                                       tag text unique)"""
 
-    def setup_categories(self):
-        json_path = Path('configs/categories')
-        cur = self.db.cursor()
-        cat_names = []
-        for f in json_path.iterdir():
-            if f.is_file() and f.suffix == '.json':
-                cat_name = f.stem
-                print(f'Found category: {cat_name}')
-                cat_names.append([cat_name])
-        try:
-            cur.executemany('INSERT INTO categories (tag) values (?)', cat_names)
-        except sqlite3.DatabaseError as de:
-            print(f' -- {de}')
-            raise
-        finally:
+            create_join_table = """CREATE TABLE categories_photos (category_id integer, photo_id integer,
+                                   constraint `fk_category_id` foreign key (category_id) references categories(id),
+                                   constraint `fk_photo_id` foreign key (photo_id) references photos(id))"""
+
+            table_mapping = {
+                'photos': create_photo_table,
+                'categories': create_category_table,
+                'categories_photos': create_join_table,
+            }
+
+            already_exists = set()
+            cur = self.db.cursor()
+            for table_name, comm in table_mapping.items():
+                try:
+                    cur.execute(comm)
+                except sqlite3.OperationalError as e:
+                    if 'already exists' in str(e):
+                        already_exists.add(table_name)
+                    else:
+                        raise e
             self.db.commit()
-            self.db.close()
 
-    def setup_photos(self):
-        cur = self.db.cursor()
-        all_photos = gather_photos()
-        items = []
-        for photo in all_photos:
-            im_w, im_h = photo.image.size
-            dt_added = datetime.fromtimestamp(photo.file_path.stat().st_ctime).isoformat()
-            items.append([str(photo.file_path), im_w, im_h, dt_added, photo.title])
-        try:
-            cur.executemany(
-                'INSERT INTO photos (img_path, img_width, img_height, date_added, title) values (?,?,?,?,?)',
-                items
-            )
-        except sqlite3.DatabaseError as de:
-            print(f' -- {de}')
-            raise
-        finally:
-            self.db.commit()
-            self.db.close()
+            self.log.info("Completed table creation")
+            self.log.info(f'The following tables previously existed: {already_exists}')
+            return set(table_mapping.keys()) - already_exists
 
-    def setup_join_table(self):
-        json_path = Path('configs/categories')
-        cur = self.db.cursor()
-        temp_mapping = {}
-        for f in json_path.iterdir():
-            if f.is_file() and f.suffix == '.json':
-                cat_name = f.stem
-                with f.open('r') as cat_file:
-                    temp_mapping[cat_name] = json.load(cat_file)
+        def check_table(table_name):
+            self.log.info('Checking table: %s', table_name)
+            cur = self.db.cursor()
+            resp = cur.execute(f"SELECT count(*) FROM {table_name}",)
+            return resp.fetchone()[0] > 0
 
-        # print(temp_mapping)
-        for k, v in temp_mapping.items():
-            q_items = [k] + v
-            print(f'Adding category mappings for: {k}')
+        def populate_categories():
+            self.log.info('Populating Category table with existing data from previous JSON data')
+            json_path = Path('configs/categories')
+            cur = self.db.cursor()
+            cat_names = []
+            for f in json_path.iterdir():
+                if f.is_file() and f.suffix == '.json':
+                    cat_name = f.stem.lower()
+                    self.log.debug(f'Found category: %s', cat_name)
+                    cat_names.append([cat_name])
+
             try:
-                qmarks = ','.join(['?']*len(v))
-                cur.execute(
-                    f'''INSERT INTO categories_photos (category_id,photo_id)
-                        SELECT c.id as category_id, p.id as photo_id
-                        FROM categories c JOIN photos p
-                        WHERE c.tag = ?
-                        AND p.img_path in ({qmarks}) 
-                    ''',
-                    q_items
+                cur.executemany('INSERT INTO categories (tag) values (?)', cat_names)
+            except sqlite3.DatabaseError as de:
+                self.log.exception(f' -- {de}')
+                raise
+            finally:
+                self.db.commit()
+            self.log.info('Completed category table population')
+
+        def populate_photos():
+            cur = self.db.cursor()
+            all_photos = gather_photos()
+            items = []
+            for photo in all_photos:
+                im_w, im_h = photo.image.size
+                dt_added = datetime.fromtimestamp(photo.file_path.stat().st_ctime).isoformat()
+                items.append([str(photo.file_path), im_w, im_h, dt_added, photo.title])
+            try:
+                cur.executemany(
+                    'INSERT INTO photos (img_path, img_width, img_height, date_added, title) values (?,?,?,?,?)',
+                    items
                 )
-                time.sleep(.5)
             except sqlite3.DatabaseError as de:
                 print(f' -- {de}')
                 raise
+            finally:
+                self.db.commit()
 
-        self.db.commit()
-        self.db.close()
+        def populate_join_table():
+            json_path = Path('configs/categories')
+            cur = self.db.cursor()
+            temp_mapping = {}
+            for f in json_path.iterdir():
+                if f.is_file() and f.suffix == '.json':
+                    cat_name = f.stem
+                    with f.open('r') as cat_file:
+                        temp_mapping[cat_name] = json.load(cat_file)
+
+            # print(temp_mapping)
+            for k, v in temp_mapping.items():
+                q_items = [k] + v
+                print(f'Adding category mappings for: {k}')
+                try:
+                    qmarks = ','.join(['?'] * len(v))
+                    cur.execute(
+                        f'''INSERT INTO categories_photos (category_id,photo_id)
+                            SELECT c.id as category_id, p.id as photo_id
+                            FROM categories c JOIN photos p
+                            WHERE c.tag = ?
+                            AND p.img_path in ({qmarks}) 
+                        ''',
+                        q_items
+                    )
+                    time.sleep(.25)
+                except sqlite3.DatabaseError as de:
+                    print(f' -- {de}')
+                    raise
+
+            self.db.commit()
+
+        try:
+            created = tables()
+            if 'categories' in created or check_table('categories'):
+                populate_categories()
+            if 'photos' in created or check_table('photos'):
+                populate_photos()
+            if 'categories_photos' in created or check_table('categories_photos'):
+                populate_join_table()
+        finally:
+            # As it currently stands, _setup is being called
+            # without actually running the whole system, so
+            # closing the db after running installs is fine
+            # at this point. However, will want to update this
+            # once new deployments are planned.
+            self.db.close()
+
+    # TODO - add load/save methods
 
 
 class CategoryService:
@@ -339,10 +388,6 @@ if __name__ == '__main__':
 
     def setup_db_items():
         tag_service = TaggingService()
-        # tag_service.setup_tables()
-        # tag_service.setup_categories()
-        # tag_service.setup_photos()
-        tag_service.setup_join_table()
 
     # test_categories()
     setup_db_items()
