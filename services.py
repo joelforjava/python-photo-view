@@ -440,10 +440,13 @@ if __name__ == '__main__':
     def test_rekog():
         rek = RekognitionTaggingService()
         all_photos = gather_photos()
-        for ii in range(5):
-            current = next(all_photos)
-            rek.load_categories_for_photo(current)
+        for ii in all_photos:
+            rek.load_categories_for_photo(ii)
             time.sleep(1)
+        # for ii in range(5):
+        #     current = next(all_photos)
+        #     rek.load_categories_for_photo(current)
+        #     time.sleep(1)
 
     with Path('configs/logging.json').open('r') as lc:
         logging.config.dictConfig(json.load(lc))
