@@ -1,5 +1,6 @@
 import json
 import logging
+import logging.config
 import sqlite3
 import time
 
@@ -8,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Union
 
+import boto3
+import botocore.exceptions
 import requests
 
 from photo import Photo
@@ -27,6 +30,51 @@ def is_image_file(file_path: Path) -> bool:
         return has_valid_suffix
 
     return file_path.exists()
+
+
+class RekognitionTaggingService:
+    def __init__(self, data_path: Path = None):
+        if not data_path:
+            data_path = Path('__photo_frame/rekognition')
+            if not data_path.exists():
+                data_path.mkdir(parents=True, exist_ok=True)
+        self.data_path = data_path
+        self.log = logging.getLogger('frame.RekognitionTaggingService')
+        self.client = boto3.client('rekognition')
+
+    def detect_labels(self, file_path: Path):
+        photo_bytes = file_path.read_bytes()
+        # TODO - ensure bytes < 5MB
+        resp = None
+        try:
+            self.log.info('Calling Rekogntion service to detect labels for %s', file_path)
+            resp = self.client.detect_labels(Image={'Bytes': photo_bytes})
+        except botocore.exceptions.ClientError as error:
+            err = error.response['Error']
+            if err['Code'] == 'InvalidImageException':
+                self.log.error('Could not detect labels via service: %s', err['Message'])
+            elif err['Code'] == 'ImageTooLargeException':
+                self.log.error('Could not process image "%s" due to size limits', file_path.name)
+                # TODO - upload to S3
+            else:
+                raise error
+
+        return resp
+
+    def load_categories_for_photo(self, photo: Photo):
+        file_name = photo.file_path.name
+
+        local_data = (self.data_path / file_name).with_suffix('.json')
+        if local_data.exists():
+            self.log.info('Retrieving labels for %s from local cache', photo.file_path)
+            with local_data.open('r') as f:
+                return json.load(f)
+        else:
+            resp = self.detect_labels(photo.file_path)
+            if resp:
+                with local_data.open('x') as f:
+                    json.dump(resp, f)
+            return resp
 
 
 class TaggingService:
@@ -389,5 +437,17 @@ if __name__ == '__main__':
     def setup_db_items():
         tag_service = TaggingService()
 
+    def test_rekog():
+        rek = RekognitionTaggingService()
+        all_photos = gather_photos()
+        for ii in range(5):
+            current = next(all_photos)
+            rek.load_categories_for_photo(current)
+            time.sleep(1)
+
+    with Path('configs/logging.json').open('r') as lc:
+        logging.config.dictConfig(json.load(lc))
+
     # test_categories()
-    setup_db_items()
+    # setup_db_items()
+    test_rekog()
