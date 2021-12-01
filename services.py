@@ -39,7 +39,7 @@ class RekognitionService:
             if not data_path.exists():
                 data_path.mkdir(parents=True, exist_ok=True)
         self.data_path = data_path
-        self.log = logging.getLogger('frame.RekognitionTaggingService')
+        self.log = logging.getLogger('frame.RekognitionService')
         self.client = boto3.client('rekognition')
 
     def detect_labels(self, file_path: Path):
@@ -61,20 +61,30 @@ class RekognitionService:
 
         return resp
 
-    def load_categories_for_photo(self, photo: Photo):
+    def load_categories_for_photo(self, photo: Photo, confidence=None):
+        if not confidence:
+            confidence = 70.0
+
         file_name = photo.file_path.name
 
         local_data = (self.data_path / file_name).with_suffix('.json')
         if local_data.exists():
             self.log.info('Retrieving labels for %s from local cache', photo.file_path)
             with local_data.open('r') as f:
-                return json.load(f)
+                resp = json.load(f)
         else:
             resp = self.detect_labels(photo.file_path)
             if resp:
                 with local_data.open('x') as f:
                     json.dump(resp, f)
-            return resp
+
+        labels = []
+        for label in resp['Labels']:
+            svc_confidence = label.get('Confidence', 0.0)
+            if svc_confidence >= confidence:
+                labels.append(label['Name'].lower())
+
+        return labels
 
 
 # TODO - rename to SqlDbCategoryService(CategoryService)
@@ -308,8 +318,7 @@ class TaggingService:
         for category in categories:
             update_category(file_path, category)
 
-    # TODO - complete load method
-    def load_from_categories(self, categories):
+    def load_from_categories(self, categories: Union[str, list]):
         """
         Load the images (as Photo objects) that represent the provided categories.
 
@@ -318,24 +327,41 @@ class TaggingService:
         :return: a Generator containing all of the images matching the provided categories.
         """
 
+        def load_all_photos():
+            stmt = """SELECT * FROM photos p """
+            cur = self.db.cursor()
+            found = cur.execute(stmt)
+
+            return (Photo(Path(p[1]), p[8]) for p in found.fetchall())
+
         def load_photos_with_categories(cat_names):
             qmarks = ','.join(['?'] * len(cat_names))
             stmt = f"""SELECT * 
-                      FROM photos p WHERE p.id IN (
-                        SELECT cp.photo_id FROM categories_photos cp
-                        WHERE cp.category_id IN (
-                          SELECT c.id
-                          FROM categories c
-                          WHERE c.tag in ({qmarks})
-                        )
-                      )"""
+                       FROM photos p WHERE p.id IN (
+                         SELECT cp.photo_id FROM categories_photos cp
+                         WHERE cp.category_id IN (
+                           SELECT c.id
+                           FROM categories c
+                           WHERE c.tag in ({qmarks})
+                         )
+                       )"""
             cur = self.db.cursor()
-            cur.execute(stmt, cat_names)
+            found = cur.execute(stmt, cat_names)
 
-        parsed = [x.strip() for x in categories.split(',')]
-        if 'all' in parsed:
+            return (Photo(Path(p[1]), p[8]) for p in found.fetchall())
+
+        if isinstance(categories, str):
+            parsed = [x.strip() for x in categories.split(',')]
+        elif isinstance(categories, list):
+            parsed = [x.strip() for x in categories]
+        else:
+            parsed = []
+
+        if 'all' in parsed or not parsed:
             # If any category is all, just return all
-            return gather_photos()
+            return load_all_photos()
+        else:
+            return load_photos_with_categories(parsed)
 
 
 # TODO - refactor CategoryService to be the abstract class/interface
@@ -555,13 +581,22 @@ if __name__ == '__main__':
     def test_rekog():
         rek = RekognitionService()
         all_photos = gather_photos()
-        for ii in all_photos:
-            rek.load_categories_for_photo(ii)
-            time.sleep(1)
-        # for ii in range(5):
-        #     current = next(all_photos)
-        #     rek.load_categories_for_photo(current)
+        # for ii in all_photos:
+        #     rek.load_categories_for_photo(ii)
         #     time.sleep(1)
+        for ii in range(5):
+            current = next(all_photos)
+            categories = rek.load_categories_for_photo(current)
+            print(f'{current} has labels: {categories}')
+            time.sleep(1)
+
+    def test_db_retrieval():
+        tag_service = TaggingService()
+        photos = tag_service.load_from_categories(['armored', 'apple', 'beach', 'all'])
+        for i, photo in enumerate(photos):
+            # photo.image.show()
+            print(f'{i} -- {photo}')
+
 
     with Path('configs/logging.json').open('r') as lc:
         logging.config.dictConfig(json.load(lc))
@@ -569,3 +604,4 @@ if __name__ == '__main__':
     # test_categories()
     # setup_db_items()
     test_rekog()
+    # test_db_retrieval()
