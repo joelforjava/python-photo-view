@@ -32,7 +32,7 @@ def is_image_file(file_path: Path) -> bool:
     return file_path.exists()
 
 
-class RekognitionTaggingService:
+class RekognitionService:
     def __init__(self, data_path: Path = None):
         if not data_path:
             data_path = Path('__photo_frame/rekognition')
@@ -77,6 +77,7 @@ class RekognitionTaggingService:
             return resp
 
 
+# TODO - rename to SqlDbCategoryService(CategoryService)
 class TaggingService:
     def __init__(self, data_path: Path = None):
         if not data_path:
@@ -221,12 +222,124 @@ class TaggingService:
             # without actually running the whole system, so
             # closing the db after running installs is fine
             # at this point. However, will want to update this
-            # once new deployments are planned.
+            # once new deployments (e.g. Pi) are planned.
             self.db.close()
 
-    # TODO - add load/save methods
+    def save_to_categories(self, file_path, tags: Union[str, list]):
+        """
+        Save a string representation of a Path to the category store using the provided tags.
+
+        :param file_path: The Path we wish to save to the category store.
+        :param tags: The tags used to represent this file.
+        :return: None
+        """
+
+        def check_for_category(cat_name):
+            cur = self.db.cursor()
+            resp = cur.execute("SELECT id FROM categories WHERE tag = ?", [cat_name])
+            return resp.fetchone()[0]
+
+        def add_category(cat_name):
+            cur = self.db.cursor()
+            resp = cur.execute("INSERT INTO categories (tag) values (?)", [cat_name])
+            self.db.commit()
+            return resp.lastrowid
+
+        def check_for_photo(photo_path):
+            cur = self.db.cursor()
+            resp = cur.execute("SELECT id FROM photos WHERE img_path = ?", [str(photo_path)])
+            return resp.fetchone()[0]
+
+        def add_photo(photo_path):
+            photo = Photo(photo_path)
+            im_w, im_h = photo.image.size
+            dt_added = datetime.fromtimestamp(photo.file_path.stat().st_ctime).isoformat()
+            values = [str(photo.file_path), im_w, im_h, dt_added, photo.title]
+            cur = self.db.cursor()
+            resp = cur.execute(
+                'INSERT INTO photos (img_path, img_width, img_height, date_added, title) values (?,?,?,?,?)',
+                values
+            )
+            self.db.commit()
+            return resp.lastrowid
+
+        def check_for_categories_photos(cat_id, photo_id):
+            cur = self.db.cursor()
+            resp = cur.execute(
+                "SELECT category_id, photo_id from categories_photos WHERE category_id = ? and photo_id = ?",
+                [cat_id, photo_id]
+            )
+            return resp.fetchone()[0]
+
+        def add_category_photo_mapping(cat_id, photo_id):
+            cur = self.db.cursor()
+            resp = cur.execute("INSERT INTO categories_photos (category_id,photo_id) VALUES (?,?)",
+                               [cat_id, photo_id])
+            self.db.commit()
+            return resp.lastrowid
+
+        def update_category(f_path, cat_name):
+            try:
+                category_id = check_for_category(cat_name)
+            except TypeError:
+                category_id = add_category(cat_name)
+
+            try:
+                photo_id = check_for_photo(f_path)
+            except TypeError:
+                photo_id = add_photo(f_path)
+
+            try:
+                check_for_categories_photos(category_id, photo_id)
+            except TypeError:
+                cat_photo_id = add_category_photo_mapping(category_id, photo_id)
+                self.log.info(
+                    'Category mapping added for category %s and photo %s at row: %d', cat_name, f_path, cat_photo_id)
+            else:
+                self.log.warning('Category mapping for category %s and photo %s already exists', cat_name, f_path)
+
+        if isinstance(tags, str):
+            categories = [x.strip() for x in tags.split(',')]
+        elif isinstance(tags, list):
+            categories = tags.copy()
+        else:
+            categories = []
+
+        for category in categories:
+            update_category(file_path, category)
+
+    # TODO - complete load method
+    def load_from_categories(self, categories):
+        """
+        Load the images (as Photo objects) that represent the provided categories.
+
+        If 'all' is provided in categories, then all images are returned.
+        :param categories: A comma-separated list of categories we wish to retrieve.
+        :return: a Generator containing all of the images matching the provided categories.
+        """
+
+        def load_photos_with_categories(cat_names):
+            qmarks = ','.join(['?'] * len(cat_names))
+            stmt = f"""SELECT * 
+                      FROM photos p WHERE p.id IN (
+                        SELECT cp.photo_id FROM categories_photos cp
+                        WHERE cp.category_id IN (
+                          SELECT c.id
+                          FROM categories c
+                          WHERE c.tag in ({qmarks})
+                        )
+                      )"""
+            cur = self.db.cursor()
+            cur.execute(stmt, cat_names)
+
+        parsed = [x.strip() for x in categories.split(',')]
+        if 'all' in parsed:
+            # If any category is all, just return all
+            return gather_photos()
 
 
+# TODO - refactor CategoryService to be the abstract class/interface
+#        and rename this to JsonCategoryService (and SqlDbCategoryService above)
 class CategoryService:
     def __init__(self, data_path: Path = None):
         if not data_path:
@@ -344,10 +457,12 @@ class PixabayPhotoFeedService:
 
 
 class PhotoDownloader:
-    def __init__(self, service, download_path: Path):
+    def __init__(self, service, download_path: Path, category_service: CategoryService = None):
+        if not category_service:
+            category_service = CategoryService(Path('configs/categories'))
         self.photo_service = service
         self.download_path = download_path
-        self.category_service = CategoryService(Path('configs/categories'))
+        self.category_service = category_service
 
     def download_feed(self):
         def has_file(file_name):
@@ -438,7 +553,7 @@ if __name__ == '__main__':
         tag_service = TaggingService()
 
     def test_rekog():
-        rek = RekognitionTaggingService()
+        rek = RekognitionService()
         all_photos = gather_photos()
         for ii in all_photos:
             rek.load_categories_for_photo(ii)
