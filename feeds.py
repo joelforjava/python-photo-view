@@ -2,13 +2,15 @@ import logging
 import random
 from pathlib import Path
 
-from services import CategoryService
+from categories import JsonCategoryService
 
 
 class PhotoFeed:
-    def __init__(self, categories=None):
+    def __init__(self, categories=None, category_service=None):
         if not categories:
             categories = 'all'
+        if not category_service:
+            category_service = JsonCategoryService(Path('configs/categories'))
         self.log = logging.getLogger('frame.PhotoFeed')
         self.temp_dir = Path('__photo_frame/photos')
         if not self.temp_dir.exists():
@@ -18,7 +20,7 @@ class PhotoFeed:
         self.photo_list = []
         self.photo_count = 0
         self.categories = categories
-        self.category_service = CategoryService(Path('configs/categories'))
+        self.category_service = category_service
         self.refresh()
 
     def refresh(self):
