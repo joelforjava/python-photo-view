@@ -47,7 +47,7 @@ class RekognitionService:
         # TODO - ensure bytes < 5MB
         resp = None
         try:
-            self.log.info('Calling Rekogntion service to detect labels for %s', file_path)
+            self.log.info('Calling Rekognition service to detect labels for %s', file_path)
             resp = self.client.detect_labels(Image={'Bytes': photo_bytes})
         except botocore.exceptions.ClientError as error:
             err = error.response['Error']
@@ -293,11 +293,17 @@ class TaggingService:
                 category_id = check_for_category(cat_name)
             except TypeError:
                 category_id = add_category(cat_name)
+                self.log.info('Category %s added to the database with id %d', cat_name, category_id)
+            else:
+                self.log.info('Category %s already exists with id %d', cat_name, category_id)
 
             try:
                 photo_id = check_for_photo(f_path)
             except TypeError:
                 photo_id = add_photo(f_path)
+                self.log.info('Photo %s added to the database with id %d', f_path, photo_id)
+            else:
+                self.log.info('Photo %s is already in the database with id %d', f_path, photo_id)
 
             try:
                 check_for_categories_photos(category_id, photo_id)
@@ -348,6 +354,7 @@ class TaggingService:
             cur = self.db.cursor()
             found = cur.execute(stmt, cat_names)
 
+            # TODO - need to verify the photo exists!
             return (Photo(Path(p[1]), p[8]) for p in found.fetchall())
 
         if isinstance(categories, str):
@@ -474,7 +481,6 @@ class PixabayPhotoFeedService:
         print(f'Downloading feed from {self.base_url}')
         response = requests.get(self.base_url, params=data, headers=headers)
         if response.status_code == 200:
-            # TODO - check to see if we can use any metadata for categorization
             self.current_feed = response.json()['hits']
         else:
             print(f'There was an error connecting to {self.base_url}: {response.status_code}')
@@ -597,11 +603,24 @@ if __name__ == '__main__':
             # photo.image.show()
             print(f'{i} -- {photo}')
 
+    def test_db_save_for_existing():
+        tag_service = TaggingService()
+        photo_path = Path('__photo_frame/photos/wave-sea-blue-beach-foam-marina-4162734.jpg')
+        categories = ['beach']
+        tag_service.save_to_categories(photo_path, categories)
+
+    def test_db_save_for_new():
+        tag_service = TaggingService()
+        photo_path = Path('__photo_frame/photos/flowers-daisies-arrangement-garden-4126095.png')
+        categories = ['testinsertphoto']  # to make it easier to remove later
+        tag_service.save_to_categories(photo_path, categories)
 
     with Path('configs/logging.json').open('r') as lc:
         logging.config.dictConfig(json.load(lc))
 
     # test_categories()
     # setup_db_items()
-    test_rekog()
+    # test_rekog()
     # test_db_retrieval()
+    # test_db_save_for_existing()
+    test_db_save_for_new()
