@@ -3,6 +3,7 @@ import logging
 import logging.config
 import sqlite3
 import time
+from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
 from typing import Union
@@ -69,8 +70,26 @@ class RekognitionService:
         return labels
 
 
-# TODO - rename to SqlDbCategoryService(CategoryService)
-class SqlDbCategoryService:
+class CategoryService(ABC):
+    @abstractmethod
+    def save_to_categories(self, file_path, tags: Union[str, list]):
+        pass
+
+    @abstractmethod
+    def load_from_categories(self, categories: Union[str, list]):
+        pass
+
+    @classmethod
+    def load(cls, service_type, data_path: Path = None):
+        if service_type.lower() == 'sql':
+            return SqlDbCategoryService(data_path)
+        elif service_type.lower() == 'json':
+            return JsonCategoryService(data_path)
+        else:
+            raise ValueError(f'Unknown service type: {service_type}')
+
+
+class SqlDbCategoryService(CategoryService):
     def __init__(self, data_path: Path = None):
         if not data_path:
             data_path = Path('__photo_frame/db/tags.db')
@@ -353,9 +372,7 @@ class SqlDbCategoryService:
             return load_photos_with_categories(parsed)
 
 
-# TODO - refactor CategoryService to be the abstract class/interface
-#        and rename this to JsonCategoryService (and SqlDbCategoryService above)
-class JsonCategoryService:
+class JsonCategoryService(CategoryService):
     def __init__(self, data_path: Path = None):
         if not data_path:
             data_path = Path('configs/categories')

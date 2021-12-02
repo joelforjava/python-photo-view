@@ -33,7 +33,15 @@ class SlideShowFrame(tk.Tk):
 
 if __name__ == '__main__':
 
+    import json
+    import logging.config
+    from pathlib import Path
+    from categories import CategoryService
+
     # Demo only the frame, assuming there are some existing images.
+
+    with Path('configs/logging.json').open('r') as lc:
+        logging.config.dictConfig(json.load(lc))
 
     frame_config = CONFIG['DEFAULT']
     _delay = frame_config.getint('delay_ms')
@@ -43,10 +51,11 @@ if __name__ == '__main__':
 
     show_titles = frame_config.getboolean('show_titles')
     categories = frame_config['categories']
+    category_service = CategoryService.load('sql')
     if show_titles:
-        _feed = TitledPhotoFeed(categories=categories)
+        _feed = TitledPhotoFeed(categories=categories, category_service=category_service)
     else:
-        _feed = PhotoFeed(categories=categories)
+        _feed = PhotoFeed(categories=categories, category_service=category_service)
 
     app = SlideShowFrame(_feed, _x, _y, _delay)
     app.show_slides()
