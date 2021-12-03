@@ -1,8 +1,10 @@
 import logging
 import random
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from categories import JsonCategoryService
+from photo import update_photo_metrics
 
 
 class PhotoFeed:
@@ -43,6 +45,8 @@ class PhotoFeed:
     def next(self):
         if self.has_photos:
             selected = random.choice(self.photo_list)
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                executor.submit(update_photo_metrics, Path('__photo_frame/db/tags.db'), selected)
             return selected.as_photo_image(), selected.title
         else:
             raise StopIteration()

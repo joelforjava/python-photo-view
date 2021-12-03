@@ -1,3 +1,4 @@
+import sqlite3
 from pathlib import Path
 
 import inflection
@@ -33,3 +34,29 @@ def create_title(image_file: Path):
     # Intended to remove the trailing digits
     minus_ext = ''.join(s for s in file_name if not s.isdigit())
     return inflection.titleize(minus_ext).strip()
+
+
+def update_photo_metrics(data_path: Path, photo: Photo):
+
+    def increment_times_displayed(entry):
+        if not entry:
+            return 1
+        else:
+            return entry + 1
+
+    with sqlite3.connect(data_path) as con:
+        con.create_function('incr_times_displayed', 1, increment_times_displayed)
+        cur = con.cursor()
+        # TODO - consider updating to use ids instead. Will need to add it to the Photo object
+        cur.execute("""UPDATE photos 
+                       SET times_displayed = incr.new_val
+                       FROM (
+                        SELECT incr_times_displayed(p1.times_displayed) as new_val
+                        FROM photos p1
+                        WHERE p1.img_path = ?
+                        ) as incr
+                        WHERE photos.img_path = ?""",
+                    (str(photo.file_path), str(photo.file_path),))
+        con.commit()
+        con.close()
+
