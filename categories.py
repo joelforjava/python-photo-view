@@ -46,19 +46,23 @@ class RekognitionService:
 
         return resp
 
-    def load_categories_for_photo(self, photo: Photo, confidence=None):
+    def load_categories_for_photo(self, photo: Union[Photo, Path], confidence=None):
         if not confidence:
             confidence = 70.0
 
-        file_name = photo.file_path.name
+        if isinstance(photo, Photo):
+            file_path = photo.file_path
+        else:
+            file_path = photo
+        file_name = file_path.name
 
         local_data = (self.data_path / file_name).with_suffix('.json')
         if local_data.exists():
-            self.log.info('Retrieving labels for %s from local cache', photo.file_path)
+            self.log.info('Retrieving labels for %s from local cache', file_path)
             with local_data.open('r') as f:
                 resp = json.load(f)
         else:
-            resp = self.detect_labels(photo.file_path)
+            resp = self.detect_labels(file_path)
             if resp:
                 with local_data.open('x') as f:
                     json.dump(resp, f)
@@ -275,7 +279,7 @@ class SqlDbCategoryService(CategoryService):
 
         self.log.info('Saving %s with categories: %s', file_path, categories)
         for category in categories:
-            self.log.info('Saving %s with category: %s', file_path, category)
+            self.log.debug('Saving %s with category: %s', file_path, category)
             update_category(file_path, category)
             self.log.debug('After update_category')
         self.log.debug('After loop')
@@ -464,19 +468,19 @@ if __name__ == '__main__':
 
 
     def setup_db_items():
-        tag_service = SqlDbCategoryService()
+        SqlDbCategoryService()
 
     def test_rekog():
         rek = RekognitionService()
         all_photos = gather_photos()
-        for ii in all_photos:
-            rek.load_categories_for_photo(ii)
-            time.sleep(1)
-        # for ii in range(5):
-        #     current = next(all_photos)
-        #     categories = rek.load_categories_for_photo(current)
-        #     print(f'{current} has labels: {categories}')
+        # for ii in all_photos:
+        #     rek.load_categories_for_photo(ii)
         #     time.sleep(1)
+        for ii in range(5):
+            current = next(all_photos)
+            categories = rek.load_categories_for_photo(current)
+            print(f'{current} has labels: {categories}')
+            time.sleep(1)
 
     def test_db_retrieval():
         tag_service = SqlDbCategoryService()
@@ -497,12 +501,22 @@ if __name__ == '__main__':
         categories = ['testinsertphoto']  # to make it easier to remove later
         tag_service.save_to_categories(photo_path, categories)
 
+    def add_rekognition_tags_to_db():
+        tag_service = SqlDbCategoryService()
+        rek = RekognitionService()
+        all_photos = gather_photos()
+        for ii in all_photos:
+            cats = rek.load_categories_for_photo(ii)
+            tag_service.save_to_categories(ii.file_path, cats)
+            time.sleep(0.25)
+
     with Path('configs/logging.json').open('r') as lc:
         logging.config.dictConfig(json.load(lc))
 
     # test_categories()
     # setup_db_items()
-    test_rekog()
+    # test_rekog()
     # test_db_retrieval()
     # test_db_save_for_existing()
     # test_db_save_for_new()
+    add_rekognition_tags_to_db()
