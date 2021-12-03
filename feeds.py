@@ -12,6 +12,7 @@ class PhotoFeed:
         if not category_service:
             category_service = JsonCategoryService(Path('configs/categories'))
         self.log = logging.getLogger('frame.PhotoFeed')
+        self.log.info('Using category service of type %s', type(category_service))
         self.temp_dir = Path('__photo_frame/photos')
         if not self.temp_dir.exists():
             self.log.debug('Temp directory not found. Will attempt to create.')

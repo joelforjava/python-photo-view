@@ -1,5 +1,7 @@
+import logging
 import tkinter as tk
 from configparser import ConfigParser
+from functools import wraps
 from pathlib import Path
 from typing import Optional
 
@@ -40,27 +42,28 @@ def show_current_screen_geometry():
 class Configuration:
 
     def __init__(self, config_dir: Optional[Path] = None, config_file_name: Optional[str] = None):
+        self.log = logging.getLogger('frame.Configuration')
         self.cfg = ConfigParser()
         if config_dir:
             self.config_dir = config_dir
         else:
             self.config_dir = (Path(__file__).parent.absolute() / 'configs').resolve()
 
-        print(f'Configuration using directory: {self.config_dir}')
+        self.log.info('Configuration using directory: %s', self.config_dir)
         if config_file_name:
             self.config_file_name = config_file_name
         else:
             self.config_file_name = 'config.ini'
 
         self.config_file = self.config_dir / self.config_file_name
-        print(f'Configuration using configuration file: {self.config_file}')
+        self.log.info('Configuration using configuration file: %s', self.config_file)
         # Initialized indicates whether or not the config data has been loaded
         # The config data is not loaded until load() is called.
         self.initialized = False
 
     def load(self, reload=False):
         if not self.initialized or reload:
-            print('Loading configuration')
+            self.log.info('Loading configuration')
             with self.config_file.open('r') as cf:
                 self.cfg.read(cf)
             self.initialized = True
@@ -68,7 +71,7 @@ class Configuration:
     def add(self, section: str, name: str, value: str):
         if section not in self.cfg:
             self.cfg.add_section(section)
-        print(f'Adding CFG[{section}][{name}] = {value}')
+        self.log.info('Adding CFG[%s][%s] = %s', section, name, value)
         self.cfg.set(section, name, value)
 
     def add_and_save(self, section: str, name: str, value: str):
@@ -88,6 +91,14 @@ class Configuration:
         return self.cfg[section_name]
 
     def persist(self):
-        print(f'Updating {self.config_file_name}')
+        self.log.info('Updating %s', self.config_file_name)
         with self.config_file.open('w') as cf:
             self.cfg.write(cf)
+
+
+def synchronized(item):
+    @wraps(item)
+    def wrapper(self, *args, **kwargs):
+        with self._lock:
+            return item(self, *args, **kwargs)
+    return wrapper

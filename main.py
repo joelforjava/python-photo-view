@@ -3,6 +3,7 @@ import logging
 import logging.config
 from pathlib import Path
 
+from categories import CategoryService
 from common import CONFIG
 from feeds import PhotoFeed, TitledPhotoFeed
 from frame import SlideShowFrame
@@ -20,7 +21,8 @@ def run():
     with Path('configs/logging.json').open('r') as lc:
         logging.config.dictConfig(json.load(lc))
     feed_service = PixabayPhotoFeedService(CONFIG['service.pixabay'])
-    downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'))
+    category_service = CategoryService.load('sql')
+    downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'), category_service=category_service)
     downloader.download_feed()
 
     frame_config = CONFIG['DEFAULT']
@@ -32,9 +34,9 @@ def run():
     show_titles = frame_config.getboolean('show_titles')
     categories = frame_config.get('categories', 'all')
     if show_titles:
-        _feed = TitledPhotoFeed(categories=categories)
+        _feed = TitledPhotoFeed(categories=categories, category_service=category_service)
     else:
-        _feed = PhotoFeed(categories=categories)
+        _feed = PhotoFeed(categories=categories, category_service=category_service)
 
     update_interval = frame_config.getint('update_interval', 300)
     thread = RepeatedTimer(update_interval, update, downloader, _feed)
@@ -44,6 +46,7 @@ def run():
         app.run()
     finally:
         thread.stop()
+        category_service.shutdown()
 
 
 if __name__ == '__main__':

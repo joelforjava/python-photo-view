@@ -1,3 +1,4 @@
+import logging
 import time
 
 from concurrent.futures import ThreadPoolExecutor
@@ -5,11 +6,12 @@ from pathlib import Path
 
 import requests
 
-from categories import JsonCategoryService
+from categories import CategoryService, JsonCategoryService
 
 
 class PixabayPhotoFeedService:
     def __init__(self, args):
+        self.log = logging.getLogger('frame.PixabayPhotoFeedService')
         self.base_url = args['base_url']
         self.api_token = args['token']
         self.image_key = args['image_key']
@@ -34,23 +36,25 @@ class PixabayPhotoFeedService:
 
         headers = {'Content-Type': 'application/json'}
 
-        print(f'Downloading feed from {self.base_url}')
+        self.log.info('Downloading feed from %s', self.base_url)
         response = requests.get(self.base_url, params=data, headers=headers)
         if response.status_code == 200:
             self.current_feed = response.json()['hits']
         else:
-            print(f'There was an error connecting to {self.base_url}: {response.status_code}')
+            self.log.error('There was an error connecting to %s: %d', self.base_url, response.status_code)
 
         return self.current_feed
 
 
 class PhotoDownloader:
-    def __init__(self, service, download_path: Path, category_service: JsonCategoryService = None):
+    def __init__(self, service, download_path: Path, category_service: CategoryService = None):
         if not category_service:
             category_service = JsonCategoryService(Path('configs/categories'))
+        self.log = logging.getLogger('frame.PhotoDownloader')
         self.photo_service = service
         self.download_path = download_path
         self.category_service = category_service
+        self.log.info('Using category service of type %s', type(category_service))
 
     def download_feed(self):
         def has_file(file_name):
@@ -71,19 +75,20 @@ class PhotoDownloader:
             page_url = item['pageURL']
             file_name = create_file_name(image_url, page_url)
             if not has_file(file_name):
-                print(f'Caching: {image_url} as \n\t{file_name}')
+                self.log.info('Caching: %s as %s', image_url, file_name)
                 resp = requests.get(image_url)
                 data = resp.content if resp.status_code == 200 else None
                 if data:
                     new_file = self.download_path / file_name
                     with new_file.open('wb') as f:
                         f.write(data)
-                    print(f'Saved {file_name}')
+                    self.log.info('Saved %s', file_name)
                     tags = item.get('tags', 'all')
-                    print(f'Saving tags: {tags}')
+                    # TODO - get additional tags from Rekognition
+                    self.log.info('Saving tags: %s', tags)
                     self.category_service.save_to_categories(new_file, tags)
             else:
-                print(f'File {file_name} was found in the cache. Skipping download.')
+                self.log.info('File %s was found in the cache. Skipping download.', file_name)
 
         feed = self.photo_service.retrieve_feed()
         if feed:

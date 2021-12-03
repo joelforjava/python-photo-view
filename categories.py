@@ -6,11 +6,13 @@ import time
 from abc import ABC, abstractmethod
 from datetime import datetime
 from pathlib import Path
+from threading import RLock
 from typing import Union
 
 import boto3
 import botocore.exceptions
 
+from common import synchronized
 from photo import Photo
 
 
@@ -79,6 +81,10 @@ class CategoryService(ABC):
     def load_from_categories(self, categories: Union[str, list]):
         pass
 
+    @abstractmethod
+    def shutdown(self):
+        pass
+
     @classmethod
     def load(cls, service_type, data_path: Path = None):
         if service_type.lower() == 'sql':
@@ -94,20 +100,43 @@ class SqlDbCategoryService(CategoryService):
         if not data_path:
             data_path = Path('__photo_frame/db/tags.db')
         self.data_path = data_path
-        self.log = logging.getLogger('frame.TaggingService')
+        self.log = logging.getLogger('frame.SqlDbCategoryService')
         requires_setup = False
         if not self.data_path.exists():
             self.log.warning('Data directory "%s" does not exist. Attempting to create', data_path)
             self.data_path.parent.mkdir(parents=True, exist_ok=True)
             requires_setup = True
-        self.db = sqlite3.connect(data_path)
+        self.db = sqlite3.connect(data_path, check_same_thread=False)
+        self._lock = RLock()
         if requires_setup:
             self._setup()
 
+    def _sync(self):
+        """
+        Sync data from the JSON Category Storage into the Database.
+        """
+        json_path = Path('configs/categories')
+        for f in json_path.iterdir():
+            if f.is_file() and f.suffix == '.json':
+                cat_name = f.stem.lower()
+                self.log.info(f'Syncing category: %s', cat_name)
+                with f.open('r') as cf:
+                    file_names = json.load(cf)
+                for file_name in file_names:
+                    self.save_to_categories(Path(file_name), cat_name)
+
+    @synchronized
     def _setup(self):
+        """
+        Set up the tables necessary for this service
+        """
 
         def tables():
-            self.log.info("Creating tables")
+            """
+            Create the tables.
+            :return: A set of table names that were created. If set is empty, then tables were already in place.
+            """
+            self.log.info("Checking tables")
             create_photo_table = """CREATE TABLE photos
                                     (id integer primary key autoincrement, img_path text, img_width integer, 
                                     img_height integer, date_added text, date_last_displayed text, 
@@ -131,10 +160,12 @@ class SqlDbCategoryService(CategoryService):
             cur = self.db.cursor()
             for table_name, comm in table_mapping.items():
                 try:
+                    self.log.info('Creating table: %s', table_name)
                     cur.execute(comm)
                 except sqlite3.OperationalError as e:
                     if 'already exists' in str(e):
                         already_exists.add(table_name)
+                        self.log.warning('Table %s already exists', table_name)
                     else:
                         raise e
             self.db.commit()
@@ -143,99 +174,14 @@ class SqlDbCategoryService(CategoryService):
             self.log.info(f'The following tables previously existed: {already_exists}')
             return set(table_mapping.keys()) - already_exists
 
-        def check_table(table_name):
-            self.log.info('Checking table: %s', table_name)
-            cur = self.db.cursor()
-            resp = cur.execute(f"SELECT count(*) FROM {table_name}",)
-            return resp.fetchone()[0] > 0
-
-        def populate_categories():
-            self.log.info('Populating Category table with existing data from previous JSON data')
-            json_path = Path('configs/categories')
-            cur = self.db.cursor()
-            cat_names = []
-            for f in json_path.iterdir():
-                if f.is_file() and f.suffix == '.json':
-                    cat_name = f.stem.lower()
-                    self.log.debug(f'Found category: %s', cat_name)
-                    cat_names.append([cat_name])
-
-            try:
-                cur.executemany('INSERT INTO categories (tag) values (?)', cat_names)
-            except sqlite3.DatabaseError as de:
-                self.log.exception(f' -- {de}')
-                raise
-            finally:
-                self.db.commit()
-            self.log.info('Completed category table population')
-
-        def populate_photos():
-            cur = self.db.cursor()
-            all_photos = gather_photos()
-            items = []
-            for photo in all_photos:
-                im_w, im_h = photo.image.size
-                dt_added = datetime.fromtimestamp(photo.file_path.stat().st_ctime).isoformat()
-                items.append([str(photo.file_path), im_w, im_h, dt_added, photo.title])
-            try:
-                cur.executemany(
-                    'INSERT INTO photos (img_path, img_width, img_height, date_added, title) values (?,?,?,?,?)',
-                    items
-                )
-            except sqlite3.DatabaseError as de:
-                print(f' -- {de}')
-                raise
-            finally:
-                self.db.commit()
-
-        def populate_join_table():
-            json_path = Path('configs/categories')
-            cur = self.db.cursor()
-            temp_mapping = {}
-            for f in json_path.iterdir():
-                if f.is_file() and f.suffix == '.json':
-                    cat_name = f.stem
-                    with f.open('r') as cat_file:
-                        temp_mapping[cat_name] = json.load(cat_file)
-
-            # print(temp_mapping)
-            for k, v in temp_mapping.items():
-                q_items = [k] + v
-                print(f'Adding category mappings for: {k}')
-                try:
-                    qmarks = ','.join(['?'] * len(v))
-                    cur.execute(
-                        f'''INSERT INTO categories_photos (category_id,photo_id)
-                            SELECT c.id as category_id, p.id as photo_id
-                            FROM categories c JOIN photos p
-                            WHERE c.tag = ?
-                            AND p.img_path in ({qmarks}) 
-                        ''',
-                        q_items
-                    )
-                    time.sleep(.25)
-                except sqlite3.DatabaseError as de:
-                    print(f' -- {de}')
-                    raise
-
-            self.db.commit()
-
         try:
             created = tables()
-            if 'categories' in created or check_table('categories'):
-                populate_categories()
-            if 'photos' in created or check_table('photos'):
-                populate_photos()
-            if 'categories_photos' in created or check_table('categories_photos'):
-                populate_join_table()
+            if created:
+                self._sync()
         finally:
-            # As it currently stands, _setup is being called
-            # without actually running the whole system, so
-            # closing the db after running installs is fine
-            # at this point. However, will want to update this
-            # once new deployments (e.g. Pi) are planned.
-            self.db.close()
+            self.log.info('Setup complete')
 
+    @synchronized
     def save_to_categories(self, file_path, tags: Union[str, list]):
         """
         Save a string representation of a Path to the category store using the provided tags.
@@ -290,6 +236,7 @@ class SqlDbCategoryService(CategoryService):
             return resp.lastrowid
 
         def update_category(f_path, cat_name):
+            self.log.debug('update_category: Saving %s with category: %s', file_path, category)
             try:
                 category_id = check_for_category(cat_name)
             except TypeError:
@@ -298,6 +245,7 @@ class SqlDbCategoryService(CategoryService):
             else:
                 self.log.info('Category %s already exists with id %d', cat_name, category_id)
 
+            self.log.debug('update_category: After checking category')
             try:
                 photo_id = check_for_photo(f_path)
             except TypeError:
@@ -306,6 +254,7 @@ class SqlDbCategoryService(CategoryService):
             else:
                 self.log.info('Photo %s is already in the database with id %d', f_path, photo_id)
 
+            self.log.debug('update_category: After checking photo')
             try:
                 check_for_categories_photos(category_id, photo_id)
             except TypeError:
@@ -315,6 +264,8 @@ class SqlDbCategoryService(CategoryService):
             else:
                 self.log.warning('Category mapping for category %s and photo %s already exists', cat_name, f_path)
 
+            self.log.debug('update_category: After checking category/photo')
+
         if isinstance(tags, str):
             categories = [x.strip() for x in tags.split(',')]
         elif isinstance(tags, list):
@@ -322,8 +273,12 @@ class SqlDbCategoryService(CategoryService):
         else:
             categories = []
 
+        self.log.info('Saving %s with categories: %s', file_path, categories)
         for category in categories:
+            self.log.info('Saving %s with category: %s', file_path, category)
             update_category(file_path, category)
+            self.log.debug('After update_category')
+        self.log.debug('After loop')
 
     def load_from_categories(self, categories: Union[str, list]):
         """
@@ -371,6 +326,9 @@ class SqlDbCategoryService(CategoryService):
         else:
             return load_photos_with_categories(parsed)
 
+    def shutdown(self):
+        self.db.close()
+
 
 class JsonCategoryService(CategoryService):
     def __init__(self, data_path: Path = None):
@@ -379,6 +337,7 @@ class JsonCategoryService(CategoryService):
         self.data_path = data_path
         if not self.data_path.exists():
             self.data_path.mkdir(parents=True, exist_ok=True)
+        self.log = logging.getLogger('frame.JsonCategoryService')
 
     def save_to_categories(self, file_path, tags: Union[str, list]):
         """
@@ -398,8 +357,9 @@ class JsonCategoryService(CategoryService):
                     if str(f_path) not in existing:
                         existing.append(str(f_path))
                         updated = True
+                        self.log.info('Added image %s to category %s', f_path, category)
                     else:
-                        print(f'Image {f_path} is already saved in category {category}.')
+                        self.log.info('Image %s is already saved in category %s.', f_path, category)
                 if updated:
                     with cat_path.open('w') as f:
                         json.dump(existing, f)
@@ -429,7 +389,7 @@ class JsonCategoryService(CategoryService):
             cat_path = self.data_path / f'{category}.json'
 
             if not cat_path.exists():
-                print(f'Category "{category}" not found.')
+                self.log.error('Category "%s" not found.', category)
                 return []
 
             with cat_path.open('r') as f:
@@ -449,6 +409,10 @@ class JsonCategoryService(CategoryService):
             all_paths.update(load_category(c))
 
         return (Photo(p) for p in all_paths)
+
+    def shutdown(self):
+        """ Do Nothing. """
+        pass
 
 
 def gather_photos(from_dir=None):
@@ -505,14 +469,14 @@ if __name__ == '__main__':
     def test_rekog():
         rek = RekognitionService()
         all_photos = gather_photos()
-        # for ii in all_photos:
-        #     rek.load_categories_for_photo(ii)
-        #     time.sleep(1)
-        for ii in range(5):
-            current = next(all_photos)
-            categories = rek.load_categories_for_photo(current)
-            print(f'{current} has labels: {categories}')
+        for ii in all_photos:
+            rek.load_categories_for_photo(ii)
             time.sleep(1)
+        # for ii in range(5):
+        #     current = next(all_photos)
+        #     categories = rek.load_categories_for_photo(current)
+        #     print(f'{current} has labels: {categories}')
+        #     time.sleep(1)
 
     def test_db_retrieval():
         tag_service = SqlDbCategoryService()
@@ -538,7 +502,7 @@ if __name__ == '__main__':
 
     # test_categories()
     # setup_db_items()
-    # test_rekog()
+    test_rekog()
     # test_db_retrieval()
     # test_db_save_for_existing()
     # test_db_save_for_new()
