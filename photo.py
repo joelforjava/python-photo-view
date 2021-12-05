@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 import inflection
@@ -49,14 +50,15 @@ def update_photo_metrics(data_path: Path, photo: Photo):
         cur = con.cursor()
         # TODO - consider updating to use ids instead. Will need to add it to the Photo object
         cur.execute("""UPDATE photos 
-                       SET times_displayed = incr.new_val
+                       SET times_displayed = incr.new_val,
+                           date_last_displayed = ?
                        FROM (
                         SELECT incr_times_displayed(p1.times_displayed) as new_val
                         FROM photos p1
                         WHERE p1.img_path = ?
                         ) as incr
                         WHERE photos.img_path = ?""",
-                    (str(photo.file_path), str(photo.file_path),))
+                    (datetime.now().isoformat(), str(photo.file_path), str(photo.file_path),))
         con.commit()
         con.close()
 
