@@ -12,7 +12,7 @@ from typing import Union
 import boto3
 import botocore.exceptions
 
-from common import synchronized
+from common import synchronized, DB_FILE_PATH, JSON_STORAGE_PATH, PHOTO_PATH, REKOGNITION_DATA_PATH
 from photo import Photo
 
 
@@ -20,7 +20,7 @@ class RekognitionService:
     def __init__(self, data_path: Path = None):
         if not data_path:
             # TODO - refactor default location to config file?
-            data_path = Path('__photo_frame/rekognition')
+            data_path = REKOGNITION_DATA_PATH
             if not data_path.exists():
                 data_path.mkdir(parents=True, exist_ok=True)
         self.data_path = data_path
@@ -102,7 +102,7 @@ class CategoryService(ABC):
 class SqlDbCategoryService(CategoryService):
     def __init__(self, data_path: Path = None):
         if not data_path:
-            data_path = Path('__photo_frame/db/tags.db')
+            data_path = DB_FILE_PATH
         self.data_path = data_path
         self.log = logging.getLogger('frame.SqlDbCategoryService')
         requires_setup = False
@@ -119,7 +119,7 @@ class SqlDbCategoryService(CategoryService):
         """
         Sync data from the JSON Category Storage into the Database.
         """
-        json_path = Path('configs/categories')
+        json_path = JSON_STORAGE_PATH
         for f in json_path.iterdir():
             if f.is_file() and f.suffix == '.json':
                 cat_name = f.stem.lower()
@@ -337,7 +337,7 @@ class SqlDbCategoryService(CategoryService):
 class JsonCategoryService(CategoryService):
     def __init__(self, data_path: Path = None):
         if not data_path:
-            data_path = Path('configs/categories')
+            data_path = JSON_STORAGE_PATH
         self.data_path = data_path
         if not self.data_path.exists():
             self.data_path.mkdir(parents=True, exist_ok=True)
@@ -421,7 +421,7 @@ class JsonCategoryService(CategoryService):
 
 def gather_photos(from_dir=None):
     if not from_dir:
-        from_dir = Path('__photo_frame/photos')
+        from_dir = PHOTO_PATH
     return (Photo(entry) for entry in from_dir.iterdir() if is_image_file(entry))
 
 
@@ -442,11 +442,13 @@ def is_image_file(file_path: Path) -> bool:
 
 
 if __name__ == '__main__':
+    from common import LOGGING_FILE_PATH
+
     # Save previously downloaded images into category files.
     # Some files have extra details, such as usernames, which will result in some strange categories.
     def save_existing():
-        category_service = JsonCategoryService(Path('configs/categories'))
-        existing_images = [entry for entry in Path('__photo_frame/photos').iterdir() if is_image_file(entry)]
+        category_service = JsonCategoryService(JSON_STORAGE_PATH)
+        existing_images = [entry for entry in PHOTO_PATH.iterdir() if is_image_file(entry)]
         for img in existing_images:
             n = img.stem
             print(f'Processing: {img}')
@@ -460,7 +462,7 @@ if __name__ == '__main__':
 
 
     def test_categories():
-        category_service = JsonCategoryService(Path('configs/categories'))
+        category_service = JsonCategoryService(JSON_STORAGE_PATH)
         trees = category_service.load_from_categories('trees,tulip,all')
 
         for item in trees:
@@ -510,7 +512,7 @@ if __name__ == '__main__':
             tag_service.save_to_categories(ii.file_path, cats)
             time.sleep(0.25)
 
-    with Path('configs/logging.json').open('r') as lc:
+    with LOGGING_FILE_PATH.open('r') as lc:
         logging.config.dictConfig(json.load(lc))
 
     # test_categories()

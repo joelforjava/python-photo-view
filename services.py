@@ -7,6 +7,7 @@ from pathlib import Path
 import requests
 
 from categories import CategoryService, JsonCategoryService, RekognitionService
+from common import JSON_STORAGE_PATH
 
 
 class PixabayPhotoFeedService:
@@ -49,7 +50,7 @@ class PixabayPhotoFeedService:
 class PhotoDownloader:
     def __init__(self, service, download_path: Path, category_service: CategoryService = None):
         if not category_service:
-            category_service = JsonCategoryService(Path('configs/categories'))
+            category_service = JsonCategoryService(JSON_STORAGE_PATH)
         self.log = logging.getLogger('frame.PhotoDownloader')
         self.photo_service = service
         self.download_path = download_path

@@ -1,7 +1,7 @@
 import logging
 import tkinter as tk
 
-from common import CONFIG
+from common import CONFIG, LOGGING_FILE_PATH
 from feeds import PhotoFeed, TitledPhotoFeed
 
 
@@ -40,7 +40,7 @@ if __name__ == '__main__':
 
     # Demo only the frame, assuming there are some existing images.
 
-    with Path('configs/logging.json').open('r') as lc:
+    with LOGGING_FILE_PATH.open('r') as lc:
         logging.config.dictConfig(json.load(lc))
 
     frame_config = CONFIG['DEFAULT']

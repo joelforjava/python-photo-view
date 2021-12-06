@@ -24,6 +24,36 @@ PHOTO_PATH = Path(PHOTO_DIRECTORY_NAME)
 
 print(f'Using photo directory of: {PHOTO_PATH}')
 
+JSON_STORAGE_DIRECTORY_NAME = CONFIG['storage.json'].get('data_directory', 'configs/categories')
+""" The name of the directory which contains the data used by the JSON version of the storage service. """
+
+JSON_STORAGE_PATH = Path(JSON_STORAGE_DIRECTORY_NAME)
+""" The path pointing to the JSON storage directory. """
+
+DB_STORAGE_DIRECTORY_NAME = CONFIG['storage.db'].get('data_directory', '__photo_frame/db')
+""" The name of the directory which contains the data used by the DB-backed version of the storage service. """
+
+DB_STORAGE_PATH = Path(DB_STORAGE_DIRECTORY_NAME)
+""" The path pointing to the DB storage directory. """
+
+DB_STORAGE_FILE_NAME = CONFIG['storage.db'].get('db_file_name', 'tags.db')
+""" The name of the database file. """
+
+DB_FILE_PATH = DB_STORAGE_PATH / DB_STORAGE_FILE_NAME
+""" The path pointing to the DB file. """
+
+REKOGNITION_STORAGE_DIRECTORY_NAME = CONFIG['service.rekognition'].get('data_directory', '__photo_frame/rekognition')
+""" The name of the directory which contains the cached data from the AWS Rekognition service. """
+
+REKOGNITION_DATA_PATH = Path(REKOGNITION_STORAGE_DIRECTORY_NAME)
+""" The path pointing to the Rekognition data directory. """
+
+LOGGING_FILE_NAME = CONFIG['logging'].get('data_file', 'configs/logging.json')
+""" The name of the file that contains logging configurations. """
+
+LOGGING_FILE_PATH = Path(LOGGING_FILE_NAME)
+""" The path pointing to the logging configuration file. """
+
 
 # Yet another courtesy of Stack Overflow
 # https://stackoverflow.com/questions/3129322/how-do-i-get-monitor-resolution-in-python/56913005#56913005

@@ -1,10 +1,9 @@
 import json
 import logging
 import logging.config
-from pathlib import Path
 
 from categories import CategoryService
-from common import CONFIG
+from common import CONFIG, LOGGING_FILE_PATH, PHOTO_PATH
 from feeds import PhotoFeed, TitledPhotoFeed
 from frame import SlideShowFrame
 from timers import RepeatedTimer
@@ -18,11 +17,11 @@ def update(downloader, feed):
 
 
 def run():
-    with Path('configs/logging.json').open('r') as lc:
+    with LOGGING_FILE_PATH.open('r') as lc:
         logging.config.dictConfig(json.load(lc))
     feed_service = PixabayPhotoFeedService(CONFIG['service.pixabay'])
     category_service = CategoryService.load('sql')
-    downloader = PhotoDownloader(feed_service, Path('__photo_frame/photos'), category_service=category_service)
+    downloader = PhotoDownloader(feed_service, PHOTO_PATH, category_service=category_service)
     downloader.download_feed()
 
     frame_config = CONFIG['DEFAULT']

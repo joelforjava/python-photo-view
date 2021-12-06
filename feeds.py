@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from categories import JsonCategoryService
+from common import DB_FILE_PATH, JSON_STORAGE_PATH, PHOTO_PATH
 from photo import update_photo_metrics
 
 
@@ -12,10 +13,10 @@ class PhotoFeed:
         if not categories:
             categories = 'all'
         if not category_service:
-            category_service = JsonCategoryService(Path('configs/categories'))
+            category_service = JsonCategoryService(JSON_STORAGE_PATH)
         self.log = logging.getLogger('frame.PhotoFeed')
         self.log.info('Using category service of type %s', type(category_service))
-        self.temp_dir = Path('__photo_frame/photos')
+        self.temp_dir = PHOTO_PATH
         if not self.temp_dir.exists():
             self.log.debug('Temp directory not found. Will attempt to create.')
             self.temp_dir.mkdir(parents=True, exist_ok=True)
@@ -46,7 +47,7 @@ class PhotoFeed:
         if self.has_photos:
             selected = random.choice(self.photo_list)
             with ThreadPoolExecutor(max_workers=1) as executor:
-                executor.submit(update_photo_metrics, Path('__photo_frame/db/tags.db'), selected)
+                executor.submit(update_photo_metrics, DB_FILE_PATH, selected)
             return selected.as_photo_image(), selected.title
         else:
             raise StopIteration()
