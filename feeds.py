@@ -1,7 +1,6 @@
 import logging
 import random
 from concurrent.futures import ThreadPoolExecutor
-from pathlib import Path
 
 from categories import JsonCategoryService
 from common import DB_FILE_PATH, JSON_STORAGE_PATH, PHOTO_PATH

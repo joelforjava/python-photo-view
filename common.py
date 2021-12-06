@@ -54,6 +54,8 @@ LOGGING_FILE_NAME = CONFIG['logging'].get('data_file', 'configs/logging.json')
 LOGGING_FILE_PATH = Path(LOGGING_FILE_NAME)
 """ The path pointing to the logging configuration file. """
 
+USE_REKOGNITION_SERVICE = CONFIG['service.rekognition'].getboolean('use_service')
+""" Should we use the AWS Rekognition service to collect additional tags/labels. """
 
 # Yet another courtesy of Stack Overflow
 # https://stackoverflow.com/questions/3129322/how-do-i-get-monitor-resolution-in-python/56913005#56913005

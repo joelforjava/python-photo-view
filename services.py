@@ -7,7 +7,7 @@ from pathlib import Path
 import requests
 
 from categories import CategoryService, JsonCategoryService, RekognitionService
-from common import JSON_STORAGE_PATH
+from common import JSON_STORAGE_PATH, USE_REKOGNITION_SERVICE
 
 
 class PixabayPhotoFeedService:
@@ -55,7 +55,7 @@ class PhotoDownloader:
         self.photo_service = service
         self.download_path = download_path
         self.category_service = category_service
-        self.rek = RekognitionService()  # TODO - make optional
+        self.rek = RekognitionService()
         self.log.info('Using category service of type %s', type(category_service))
 
     def download_feed(self):
@@ -90,9 +90,10 @@ class PhotoDownloader:
                     self.log.info('Saving tags: %s', tags)
                     self.category_service.save_to_categories(new_file, tags)
 
-                    rek_tags = self.rek.load_categories_for_photo(new_file)
-                    self.log.info('Saving Rekognition tags: %s', tags)
-                    self.category_service.save_to_categories(new_file, rek_tags)
+                    if USE_REKOGNITION_SERVICE:
+                        rek_tags = self.rek.load_categories_for_photo(new_file)
+                        self.log.info('Saving Rekognition tags: %s', tags)
+                        self.category_service.save_to_categories(new_file, rek_tags)
             else:
                 self.log.info('File %s was found in the cache. Skipping download.', file_name)
 

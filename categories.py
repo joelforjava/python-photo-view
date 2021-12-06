@@ -19,7 +19,6 @@ from photo import Photo
 class RekognitionService:
     def __init__(self, data_path: Path = None):
         if not data_path:
-            # TODO - refactor default location to config file?
             data_path = REKOGNITION_DATA_PATH
             if not data_path.exists():
                 data_path.mkdir(parents=True, exist_ok=True)
@@ -298,7 +297,7 @@ class SqlDbCategoryService(CategoryService):
             cur = self.db.cursor()
             found = cur.execute(stmt)
 
-            return (Photo(Path(p[1]), p[8]) for p in found.fetchall())
+            return (Photo(Path(p[1]), p[8], p[0]) for p in found.fetchall())
 
         def load_photos_with_categories(cat_names):
             qmarks = ','.join(['?'] * len(cat_names))
@@ -315,7 +314,7 @@ class SqlDbCategoryService(CategoryService):
             found = cur.execute(stmt, cat_names)
 
             # TODO - need to verify the photo exists!
-            return (Photo(Path(p[1]), p[8]) for p in found.fetchall())
+            return (Photo(Path(p[1]), p[8], p[0]) for p in found.fetchall())
 
         if isinstance(categories, str):
             parsed = [x.strip() for x in categories.split(',')]
