@@ -6,6 +6,7 @@ from categories import CategoryService
 from common import CONFIG, LOGGING_FILE_PATH, PHOTO_PATH
 from feeds import PhotoFeed, TitledPhotoFeed
 from frame import SlideShowFrame
+# from metrics import MemoryMonitor, log_mem_usage
 from timers import RepeatedTimer
 from services import PixabayPhotoFeedService, PhotoDownloader
 
@@ -37,6 +38,7 @@ def run():
     else:
         _feed = PhotoFeed(categories=categories, category_service=category_service)
 
+    # mem_thread = RepeatedTimer(60, log_mem_usage)
     update_interval = frame_config.getint('update_interval', 300)
     thread = RepeatedTimer(update_interval, update, downloader, _feed)
     try:
@@ -45,6 +47,7 @@ def run():
         app.run()
     finally:
         thread.stop()
+        # mem_thread.stop()
         category_service.shutdown()
 
 

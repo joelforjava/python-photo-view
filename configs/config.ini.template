@@ -10,3 +10,18 @@ base_url = https://pixabay.com/api
 image_key = largeImageURL
 token = abcdef-123401aaaaaaaaaa
 category = music
+editors_choice = true
+
+[service.rekognition]
+data_directory = __photo_frame/rekognition
+use_service = yes
+
+[storage.json]
+data_directory = configs/categories
+
+[storage.db]
+data_directory = __photo_frame/db
+db_file_name = tags.db
+
+[logging]
+data_file = configs/logging.json

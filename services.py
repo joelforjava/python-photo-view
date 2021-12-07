@@ -95,7 +95,7 @@ class PhotoDownloader:
                         self.log.info('Saving Rekognition tags: %s', tags)
                         self.category_service.save_to_categories(new_file, rek_tags)
             else:
-                self.log.info('File %s was found in the cache. Skipping download.', file_name)
+                self.log.debug('File %s was found in the cache. Skipping download.', file_name)
 
         feed = self.photo_service.retrieve_feed()
         if feed:

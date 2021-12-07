@@ -140,11 +140,12 @@ class SqlDbCategoryService(CategoryService):
             :return: A set of table names that were created. If set is empty, then tables were already in place.
             """
             self.log.info("Checking tables")
+
             create_photo_table = """CREATE TABLE photos
                                     (id integer primary key autoincrement, img_path text, img_width integer, 
                                     img_height integer, date_added text, date_last_displayed text, 
-                                    times_displayed integer, disabled text, title text, subtitle text, 
-                                    score integer)"""
+                                    times_displayed integer, disabled integer, title text, subtitle text, 
+                                    score integer, source_service text)"""
 
             create_category_table = """CREATE TABLE categories (id integer primary key autoincrement, 
                                        tag text unique)"""
