@@ -35,7 +35,6 @@ if __name__ == '__main__':
 
     import json
     import logging.config
-    from pathlib import Path
     from categories import CategoryService
 
     # Demo only the frame, assuming there are some existing images.
