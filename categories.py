@@ -15,6 +15,8 @@ import botocore.exceptions
 from common import synchronized, DB_FILE_PATH, JSON_STORAGE_PATH, PHOTO_PATH, REKOGNITION_DATA_PATH
 from photo import Photo
 
+MAX_FILE_SIZE = 5_242_880
+
 
 class RekognitionService:
     def __init__(self, data_path: Path = None):
@@ -28,8 +30,10 @@ class RekognitionService:
 
     def detect_labels(self, file_path: Path):
         photo_bytes = file_path.read_bytes()
-        # TODO - ensure bytes < 5MB
         resp = None
+        if len(photo_bytes) >= MAX_FILE_SIZE:
+            self.log.error('The image provided "%s" is too large. Upload to S3 to retry this request.', file_path)
+            return resp
         try:
             self.log.info('Calling Rekognition service to detect labels for %s', file_path)
             resp = self.client.detect_labels(Image={'Bytes': photo_bytes})

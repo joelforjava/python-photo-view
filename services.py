@@ -35,6 +35,9 @@ class PixabayPhotoFeedService(PhotoFeedService):
         self.editors_choice = args.get('editors_choice', 'false')
         self.current_feed = None
 
+    # TODO - refactor to return a 'common' feed object
+    # or create a new method that parses the feed to return
+    # that 'common' object/response.
     def retrieve_feed(self):
         """ Get latest photo feed """
         data = {
@@ -85,6 +88,9 @@ class PhotoDownloader:
             return file_name + file_extension
 
         def download_photo(item):
+            # TODO - things like 'largeImageURL', 'tags', etc will
+            # need to be factored out back to the 'service' class
+            # and then this can be updated to handle a uniform object
             image_url = item['largeImageURL']
             page_url = item['pageURL']
             file_name = create_file_name(image_url, page_url)
@@ -104,8 +110,9 @@ class PhotoDownloader:
 
                     if USE_REKOGNITION_SERVICE:
                         rek_tags = self.rek.load_categories_for_photo(new_file)
-                        self.log.info('Saving Rekognition tags: %s', tags)
-                        self.category_service.save_to_categories(new_file, rek_tags)
+                        if rek_tags:
+                            self.log.info('Saving Rekognition tags: %s', tags)
+                            self.category_service.save_to_categories(new_file, rek_tags)
             else:
                 self.log.debug('File %s was found in the cache. Skipping download.', file_name)
 
