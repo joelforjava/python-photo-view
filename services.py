@@ -1,6 +1,7 @@
 import logging
 import time
 
+from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -10,7 +11,18 @@ from categories import CategoryService, JsonCategoryService, RekognitionService
 from common import JSON_STORAGE_PATH, USE_REKOGNITION_SERVICE
 
 
-class PixabayPhotoFeedService:
+class PhotoFeedService(ABC):
+    SOURCE_NAME = 'NONE'
+
+    @abstractmethod
+    def retrieve_feed(self):
+        pass
+
+
+class PixabayPhotoFeedService(PhotoFeedService):
+
+    SOURCE_NAME = 'PIXABAY'
+
     def __init__(self, args):
         self.log = logging.getLogger('frame.PixabayPhotoFeedService')
         self.base_url = args['base_url']
@@ -48,7 +60,7 @@ class PixabayPhotoFeedService:
 
 
 class PhotoDownloader:
-    def __init__(self, service, download_path: Path, category_service: CategoryService = None):
+    def __init__(self, service: PhotoFeedService, download_path: Path, category_service: CategoryService = None):
         if not category_service:
             category_service = JsonCategoryService(JSON_STORAGE_PATH)
         self.log = logging.getLogger('frame.PhotoDownloader')

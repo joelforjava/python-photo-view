@@ -145,7 +145,7 @@ class SqlDbCategoryService(CategoryService):
                                     (id integer primary key autoincrement, img_path text, img_width integer, 
                                     img_height integer, date_added text, date_last_displayed text, 
                                     times_displayed integer, disabled integer, title text, subtitle text, 
-                                    score integer, source_service text)"""
+                                    score integer, source_name text)"""
 
             create_category_table = """CREATE TABLE categories (id integer primary key autoincrement, 
                                        tag text unique)"""
